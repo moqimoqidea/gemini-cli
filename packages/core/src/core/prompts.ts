@@ -82,7 +82,13 @@ export function getCoreSystemPrompt(
     Do not plan or execute any actions other than to call the adk_main_loop
     tool, which will handle all planning and execution.`;
   }
+  return resolveSystemPrompt(config, userMemory);
+}
 
+export function resolveSystemPrompt(
+  config: Config,
+  userMemory?: string,
+): string {
   // A flag to indicate whether the system prompt override is active.
   let systemMdEnabled = false;
   // The default path for the system prompt file. This can be overridden.

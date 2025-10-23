@@ -339,19 +339,10 @@ export class AdkAgentExecutor<TOutput extends z.ZodTypeAny>
               const response = part.functionResponse.response as {
                 result: string;
               };
-              const result = JSON.parse(response.result);
-              const validationResult = outputConfig.schema.safeParse(result);
-              if (validationResult.success) {
-                if (this.definition.processOutput) {
-                  finalResult = this.definition.processOutput(
-                    validationResult.data,
-                  );
-                } else {
-                  finalResult = JSON.stringify(part.functionResponse.response);
-                }
-              } else {
-                finalResult = JSON.stringify(validationResult.error.flatten());
-              }
+
+              // TODO: validate response against the schema; does ADK give
+              // us that for free?
+              finalResult = response.result;
               break;
             }
           }

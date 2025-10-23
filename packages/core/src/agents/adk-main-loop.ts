@@ -6,7 +6,7 @@
 
 import type { AgentDefinition } from './types.js';
 import { z } from 'zod';
-import { getCoreSystemPrompt } from '../core/prompts.js';
+import { resolveSystemPrompt } from '../core/prompts.js';
 import type { Config } from '../config/config.js';
 import * as toolNames from '../tools/tool-names.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
@@ -52,7 +52,7 @@ export const AdkMainLoopAgent: AgentDefinition<typeof AdkMainLoopOutputSchema> =
       query: `\${objective}`,
       systemPrompt: (config: Config) => {
         const userMemory = config.getUserMemory();
-        const systemInstruction = getCoreSystemPrompt(config, userMemory);
+        const systemInstruction = resolveSystemPrompt(config, userMemory);
         return systemInstruction;
       },
     },

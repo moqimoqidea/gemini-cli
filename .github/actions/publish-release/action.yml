@@ -162,6 +162,11 @@ runs:
       uses: './.github/actions/npm-auth-token'
       id: 'core-token'
       with:
+        package-name: '${{ inputs.core-package-name }}'
+        github-token: '${{ inputs.github-token }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
 
     - name: '📦 Publish CORE to NPM'
       if: "${{ inputs.use-bundle-release == 'false' }}"

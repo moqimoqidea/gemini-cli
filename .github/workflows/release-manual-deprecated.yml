@@ -1,4 +1,4 @@
-name: 'Release: Manual'
+name: 'Release: Manual (Deprecated)'
 
 on:
   workflow_dispatch:
@@ -34,11 +34,6 @@ on:
       skip_github_release:
         description: 'Select to skip creating a GitHub release (only used when environment is PROD)'
         required: false
-        type: 'boolean'
-        default: false
-      use_bundle_release:
-        description: 'Use the new bundle-based release process.'
-        required: true
         type: 'boolean'
         default: false
       environment:
@@ -126,10 +121,10 @@ jobs:
           cli-package-name: '${{ vars.CLI_PACKAGE_NAME }}'
           core-package-name: '${{ vars.CORE_PACKAGE_NAME }}'
           a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
-          use-bundle-release: '${{ github.event.inputs.use_bundle_release }}'
+          use-bundle-release: 'false'
 
       - name: 'Create Issue on Failure'
-        if: '${{ failure() && github.event.inputs.dry_run == false }}'
+        if: "${{ failure() && github.event.inputs.dry_run == false }}"
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_TAG: '${{ github.event.inputs.version }}'

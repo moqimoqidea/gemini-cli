@@ -127,29 +127,6 @@ runs:
           echo "Dry run enabled. Skipping push."
         fi
 
-    - name: '🛠️ Build and Prepare Packages'
-      if: "${{ inputs.use-bundle-release == 'false' }}"
-      working-directory: '${{ inputs.working-directory }}'
-      shell: 'bash'
-      run: |
-        npm run build:packages
-        npm run prepare:package
-
-    - name: '🎁 Bundle'
-      if: "${{ inputs.use-bundle-release == 'true' }}"
-      working-directory: '${{ inputs.working-directory }}'
-      shell: 'bash'
-      run: |
-        npm run bundle
-
-    # TODO: Refactor this github specific publishing script to be generalized based upon inputs.
-    - name: '📦 Prepare for GitHub release'
-      if: "inputs.npm-registry-url == 'https://npm.pkg.github.com/'"
-      working-directory: '${{ inputs.working-directory }}'
-      shell: 'bash'
-      run: |
-        node ${{ github.workspace }}/scripts/prepare-github-release.js
-
     - name: 'Configure npm for publishing to npm (non-bundle release)'
       if: "inputs.use-bundle-release == 'false'"
       uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
@@ -157,6 +134,14 @@ runs:
         node-version-file: '${{ inputs.working-directory }}/.nvmrc'
         registry-url: '${{inputs.npm-registry-publish-url}}'
         scope: '${{inputs.npm-registry-scope}}'
+
+    - name: '🛠️ Build and Prepare Packages'
+      if: "${{ inputs.use-bundle-release == 'false' }}"
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        npm run build:packages
+        npm run prepare:package
 
     - name: 'Get core Token'
       uses: './.github/actions/npm-auth-token'

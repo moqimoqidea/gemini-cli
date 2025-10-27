@@ -134,6 +134,9 @@ runs:
         node-version-file: '${{ inputs.working-directory }}/.nvmrc'
         registry-url: '${{inputs.npm-registry-publish-url}}'
         scope: '${{inputs.npm-registry-scope}}'
+        cache-dependency-path: '${{ inputs.working-directory }}/package-lock.json'
+        cache: 'npm'
+        cache-key: 'npm-cache-non-bundle-${{ github.sha }}'
 
     - name: '🛠️ Build and Prepare Packages'
       if: "${{ inputs.use-bundle-release == 'false' }}"

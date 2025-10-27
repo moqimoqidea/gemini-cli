@@ -56,6 +56,7 @@ import type { RoutingContext } from '../routing/routingStrategy.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 import { AdkMainLoopAgent } from '../agents/adk-main-loop.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export function isThinkingSupported(model: string) {
   return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
@@ -357,7 +358,7 @@ My setup is complete. I will provide my first command in the next turn.
       ];
 
       if (this.config.getDebugMode()) {
-        console.log(contextParts.join('\n'));
+        debugLogger.log(contextParts.join('\n'));
       }
       return {
         contextParts,
@@ -467,7 +468,7 @@ My setup is complete. I will provide my first command in the next turn.
       ];
 
       if (this.config.getDebugMode()) {
-        console.log(contextParts.join('\n'));
+        debugLogger.log(contextParts.join('\n'));
       }
       return {
         contextParts,

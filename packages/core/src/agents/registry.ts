@@ -10,6 +10,7 @@ import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { DEFAULT_TEMP, DEFAULT_TOP_P } from '../config/models.js';
 import { type z } from 'zod';
 import { AdkMainLoopAgent } from './adk-main-loop.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Manages the discovery, loading, validation, and registration of
@@ -28,7 +29,7 @@ export class AgentRegistry {
     this.loadBuiltInAgents();
 
     if (this.config.getDebugMode()) {
-      console.log(
+      debugLogger.log(
         `[AgentRegistry] Initialized with ${this.agents.size} agents.`,
       );
     }
@@ -83,14 +84,14 @@ export class AgentRegistry {
   ): void {
     // Basic validation
     if (!definition.name || !definition.description) {
-      console.warn(
+      debugLogger.warn(
         `[AgentRegistry] Skipping invalid agent definition. Missing name or description.`,
       );
       return;
     }
 
     if (this.agents.has(definition.name) && this.config.getDebugMode()) {
-      console.log(`[AgentRegistry] Overriding agent '${definition.name}'`);
+      debugLogger.log(`[AgentRegistry] Overriding agent '${definition.name}'`);
     }
 
     this.agents.set(definition.name, definition);

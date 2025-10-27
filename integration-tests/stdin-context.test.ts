@@ -78,20 +78,28 @@ describe('stdin context', () => {
     const rig = new TestRig();
     await rig.setup('should exit quickly if stdin stream does not end');
 
+    let duration = 0;
+    const startTime = performance.now();
+
     try {
       await rig.run({ stdinDoesNotEnd: true });
-      throw new Error('Expected rig.run to throw an error');
     } catch (error: unknown) {
       expect(error).toBeInstanceOf(Error);
       const err = error as Error;
 
       expect(err.message).toContain('Process exited with code 1');
       expect(err.message).toContain('No input provided via stdin.');
-      console.log('Error message:', err.message);
+    } finally {
+      const endTime = performance.now();
+      duration = endTime - startTime;
+      console.log(`Process exited in ${duration.toFixed(2)} ms`);
     }
+
+    expect(duration).toBeLessThan(3000);
+
     const lastRequest = rig.readLastApiRequest();
     expect(lastRequest).toBeNull();
 
     // If this test times out, runs indefinitely, it's a regression.
-  }, 3000);
+  });
 });

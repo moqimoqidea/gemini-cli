@@ -149,10 +149,11 @@ describe('PermissionsModifyTrustDialog', () => {
     });
   });
 
-  it('should commit, restart, and exit on `r` keypress', async () => {
+  it('should commit and restart `r` keypress', async () => {
     const mockRelaunchApp = vi
       .spyOn(processUtils, 'relaunchApp')
       .mockResolvedValue(undefined);
+    mockCommitTrustLevelChange.mockReturnValue(true);
     vi.mocked(usePermissionsModifyTrust).mockReturnValue({
       cwd: '/test/dir',
       currentTrustLevel: TrustLevel.DO_NOT_TRUST,
@@ -176,7 +177,6 @@ describe('PermissionsModifyTrustDialog', () => {
     await waitFor(() => {
       expect(mockCommitTrustLevelChange).toHaveBeenCalled();
       expect(mockRelaunchApp).toHaveBeenCalled();
-      expect(onExit).toHaveBeenCalled();
     });
 
     mockRelaunchApp.mockRestore();

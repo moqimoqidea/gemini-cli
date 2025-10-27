@@ -145,29 +145,32 @@ function validateHistory(history: HistoryContent[]) {
 function extractCuratedHistory(
   comprehensiveHistory: HistoryContent[],
 ): HistoryContent[] {
-  if (!comprehensiveHistory) {
+  if (comprehensiveHistory === undefined || comprehensiveHistory.length === 0) {
     return [];
   }
-
   const curatedHistory: HistoryContent[] = [];
-  for (let i = 0; i < comprehensiveHistory.length; i++) {
-    const currentContent = comprehensiveHistory[i];
-
-    if (currentContent.role === 'user') {
-      if (!currentContent.isPartial) {
-        curatedHistory.push(currentContent);
-      }
-    } else if (currentContent.role === 'model') {
-      // Look ahead to see if the next turn is a partial user turn
-      const nextContent = comprehensiveHistory[i + 1];
-      if (nextContent && nextContent.role === 'user' && nextContent.isPartial) {
-        // Skip this model turn and the next partial user turn
+  const length = comprehensiveHistory.length;
+  let i = 0;
+  while (i < length) {
+    if (comprehensiveHistory[i].role === 'user') {
+      curatedHistory.push(comprehensiveHistory[i]);
+      i++;
+    } else {
+      const modelOutput: HistoryContent[] = [];
+      let isValid = true;
+      while (i < length && comprehensiveHistory[i].role === 'model') {
+        const currentContent = comprehensiveHistory[i];
+        modelOutput.push(currentContent);
+        if (
+          isValid &&
+          (!isValidContent(currentContent) || currentContent.isPartial)
+        ) {
+          isValid = false;
+        }
         i++;
-        continue;
       }
-
-      if (isValidContent(currentContent) && !currentContent.isPartial) {
-        curatedHistory.push(currentContent);
+      if (isValid) {
+        curatedHistory.push(...modelOutput);
       }
     }
   }
@@ -281,7 +284,6 @@ export class GeminiChat {
           attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
           attempt++
         ) {
-          const historyLengthBeforeAttempt = self.history.length;
           try {
             if (attempt > 0) {
               yield { type: StreamEventType.RETRY };
@@ -295,10 +297,7 @@ export class GeminiChat {
                 temperature: 1,
               };
             }
-            console.log(
-              'Before API call',
-              JSON.stringify(self.history, null, 2),
-            );
+
             const stream = await self.makeApiCallAndProcessStream(
               model,
               requestContents,
@@ -313,19 +312,9 @@ export class GeminiChat {
             lastError = null;
             break;
           } catch (error) {
-            console.log('Inner catch', JSON.stringify(self.history, null, 2));
             lastError = error;
-
-            // For any error except a stream interruption, we should remove the partial
-            // history entry that was added for this attempt.
-            if ((error as Error).message !== 'Stream interrupted') {
-              // Reset history to the state before this failed attempt.
-              if (self.history.length > historyLengthBeforeAttempt) {
-                self.history.splice(historyLengthBeforeAttempt);
-              }
-            }
-
             const isContentError = error instanceof InvalidStreamError;
+
             if (isContentError) {
               // Check if we have more attempts left.
               if (attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts - 1) {
@@ -365,13 +354,7 @@ export class GeminiChat {
           }
           throw lastError;
         }
-      } catch (error) {
-        // The inner loop now handles all history cleanup.
-        // This block will just re-throw the error.
-        console.log('Outer catch', JSON.stringify(self.history, null, 2));
-        throw error;
       } finally {
-        console.log('Finally', JSON.stringify(self.history, null, 2));
         streamDoneResolver!();
       }
     })();
@@ -575,10 +558,6 @@ export class GeminiChat {
       }
       streamSuccessful = true;
     } finally {
-      console.log(
-        'processStreamResponse finally',
-        JSON.stringify(this.history, null, 2),
-      );
       // String thoughts and consolidate text parts.
       const consolidatedParts: Part[] = [];
       for (const part of modelResponseParts) {

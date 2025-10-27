@@ -493,7 +493,7 @@ describe('GeminiChat', () => {
     });
     it('should throw an error when a tool call is followed by an empty stream response', async () => {
       // 1. Setup: A history where the model has just made a function call.
-      const initialHistory: HistoryContent[] = [
+      const initialHistory: Content[] = [
         {
           role: 'user',
           parts: [{ text: 'Find a good Italian restaurant for me.' }],
@@ -954,7 +954,6 @@ describe('GeminiChat', () => {
       expect(history[1]).toEqual({
         role: 'model',
         parts: [{ text: 'Successful response' }],
-        isPartial: false,
       });
 
       // Verify that token counting is not called when usageMetadata is missing
@@ -1284,7 +1283,7 @@ describe('GeminiChat', () => {
   });
   it('should correctly retry and append to an existing history mid-conversation', async () => {
     // 1. Setup
-    const initialHistory: HistoryContent[] = [
+    const initialHistory: Content[] = [
       { role: 'user', parts: [{ text: 'First question' }] },
       { role: 'model', parts: [{ text: 'First answer' }] },
     ];

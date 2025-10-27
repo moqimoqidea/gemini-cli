@@ -24,7 +24,6 @@ export async function readStdin(): Promise<string> {
     const onReadable = () => {
       let chunk;
       while ((chunk = process.stdin.read()) !== null) {
-        console.log('CHUNK IS:', chunk);
         if (pipedInputTimerId) {
           clearTimeout(pipedInputTimerId);
           pipedInputTimerId = null;

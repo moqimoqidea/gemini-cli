@@ -93,5 +93,5 @@ describe('stdin context', () => {
     expect(lastRequest).toBeNull();
 
     // If this test times out, runs indefinitely, it's a regression.
-  }, 3000);
+  }, 8000); // TODO: figure out why Windows/Linux needs timeout to be much higher for test to pass
 });

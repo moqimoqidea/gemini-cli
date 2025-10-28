@@ -174,6 +174,10 @@ describe('Gemini Client (client.ts)', () => {
   let mockGenerateContentFn: Mock;
   beforeEach(async () => {
     vi.resetAllMocks();
+    vi.mocked(getCoreSystemPrompt).mockReturnValue({
+      prompt: 'test system prompt',
+      customPromptPath: undefined,
+    });
     vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
 
     vi.mocked(ChatCompressionService.prototype.compress).mockResolvedValue({
@@ -2248,7 +2252,10 @@ ${JSON.stringify(
           model: DEFAULT_GEMINI_FLASH_MODEL,
           config: {
             abortSignal,
-            systemInstruction: getCoreSystemPrompt({} as unknown as Config, ''),
+            systemInstruction: getCoreSystemPrompt(
+              {} as unknown as Config,
+              '',
+            ).prompt,
             temperature: 0.5,
             topP: 1,
           },

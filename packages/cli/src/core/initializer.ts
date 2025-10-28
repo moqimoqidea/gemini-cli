@@ -12,6 +12,7 @@ import {
   type Config,
   StartSessionEvent,
   logCliConfiguration,
+  getCoreSystemPrompt,
 } from '@google/gemini-cli-core';
 import { type LoadedSettings } from '../config/settings.js';
 import { performInitialAuth } from './auth.js';
@@ -44,9 +45,10 @@ export async function initializeApp(
   const shouldOpenAuthDialog =
     settings.merged.security?.auth?.selectedType === undefined || !!authError;
 
+  const { customPromptPath } = getCoreSystemPrompt(config);
   logCliConfiguration(
     config,
-    new StartSessionEvent(config, config.getToolRegistry()),
+    new StartSessionEvent(config, config.getToolRegistry(), customPromptPath),
   );
 
   if (config.getIdeMode()) {

@@ -203,7 +203,11 @@ describe('loggers', () => {
         getExtensions: () => [],
       } as unknown as Config;
 
-      const startSessionEvent = new StartSessionEvent(mockConfig);
+      const startSessionEvent = new StartSessionEvent(
+        mockConfig,
+        undefined,
+        'foo/bar.md',
+      );
       logCliConfiguration(mockConfig, startSessionEvent);
 
       expect(mockLogger.emit).toHaveBeenCalledWith({
@@ -231,6 +235,7 @@ describe('loggers', () => {
           output_format: 'json',
           extension_ids: '',
           extensions_count: 0,
+          custom_prompt_path: 'foo/bar.md',
         },
       });
     });

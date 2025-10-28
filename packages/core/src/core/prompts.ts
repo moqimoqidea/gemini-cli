@@ -77,7 +77,7 @@ export function resolvePathFromEnv(envVar?: string): {
 export function getCoreSystemPrompt(
   config: Config,
   userMemory?: string,
-): string {
+): { prompt: string; customPromptPath: string | undefined } {
   // A flag to indicate whether the system prompt override is active.
   let systemMdEnabled = false;
   // The default path for the system prompt file. This can be overridden.
@@ -87,6 +87,8 @@ export function getCoreSystemPrompt(
     process.env['GEMINI_SYSTEM_MD'],
   );
 
+  let customPromptPath: string | undefined;
+
   // Proceed only if the environment variable is set and is not disabled.
   if (systemMdResolution.value && !systemMdResolution.isDisabled) {
     systemMdEnabled = true;
@@ -95,6 +97,8 @@ export function getCoreSystemPrompt(
     if (!systemMdResolution.isSwitch) {
       systemMdPath = systemMdResolution.value;
     }
+
+    customPromptPath = systemMdPath;
 
     // require file to exist when override is enabled
     if (!fs.existsSync(systemMdPath)) {
@@ -294,7 +298,7 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
       ? `\n\n---\n\n${userMemory.trim()}`
       : '';
 
-  return `${basePrompt}${memorySuffix}`;
+  return { prompt: `${basePrompt}${memorySuffix}`, customPromptPath };
 }
 
 /**

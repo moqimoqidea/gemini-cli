@@ -32,7 +32,7 @@ import {
   runExitCleanup,
 } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
-import type { Config } from '@google/gemini-cli-core';
+import { type Config, recordSlowRender } from '@google/gemini-cli-core';
 import {
   sessionId,
   logUserPrompt,
@@ -69,6 +69,8 @@ import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { ExtensionManager } from './config/extension-manager.js';
 import { createPolicyUpdater } from './config/policy.js';
 import { requestConsentNonInteractive } from './config/extensions/consent.js';
+
+const SLOW_RENDER_MS = 200;
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -205,6 +207,11 @@ export async function startInteractiveUI(
     {
       exitOnCtrlC: false,
       isScreenReaderEnabled: config.getScreenReader(),
+      onRender: ({ renderTime }) => {
+        if (renderTime > SLOW_RENDER_MS) {
+          recordSlowRender(config);
+        }
+      },
     },
   );
 

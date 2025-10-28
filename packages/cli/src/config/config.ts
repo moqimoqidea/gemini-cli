@@ -74,6 +74,7 @@ export interface CliArgs {
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
+  recordResponses: string | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -202,6 +203,12 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('fake-responses', {
           type: 'string',
           description: 'Path to a file with fake model responses for testing.',
+          hidden: true,
+        })
+        .option('record-responses', {
+          type: 'string',
+          description: 'Path to a file to record model responses for testing.',
+          hidden: true,
         })
         .deprecateOption(
           'prompt',
@@ -423,7 +430,7 @@ export async function loadCliConfig(
     workspaceDir: cwd,
     enabledExtensionOverrides: argv.extensions,
   });
-  extensionManager.loadExtensions();
+  await extensionManager.loadExtensions();
 
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount, filePaths } =
@@ -507,7 +514,31 @@ export async function loadCliConfig(
     throw err;
   }
 
-  const policyEngineConfig = createPolicyEngineConfig(settings, approvalMode);
+  const policyEngineConfig = await createPolicyEngineConfig(
+    settings,
+    approvalMode,
+  );
+
+  // Debug: Log the merged policy configuration
+  // Only log when message bus integration is enabled (when policies are active)
+  const enableMessageBusIntegration =
+    settings.tools?.enableMessageBusIntegration ?? false;
+  if (enableMessageBusIntegration) {
+    debugLogger.debug('=== Policy Engine Configuration ===');
+    debugLogger.debug(
+      `Default decision: ${policyEngineConfig.defaultDecision}`,
+    );
+    debugLogger.debug(`Total rules: ${policyEngineConfig.rules?.length || 0}`);
+    if (policyEngineConfig.rules && policyEngineConfig.rules.length > 0) {
+      debugLogger.debug('Rules (sorted by priority):');
+      policyEngineConfig.rules.forEach((rule, index) => {
+        debugLogger.debug(
+          `  [${index}] toolName: ${rule.toolName || '*'}, decision: ${rule.decision}, priority: ${rule.priority}, argsPattern: ${rule.argsPattern ? rule.argsPattern.source : 'none'}`,
+        );
+      });
+    }
+    debugLogger.debug('===================================');
+  }
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -672,11 +703,11 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     useModelRouter,
-    enableMessageBusIntegration:
-      settings.tools?.enableMessageBusIntegration ?? false,
+    enableMessageBusIntegration,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
     fakeResponses: argv.fakeResponses,
+    recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
     ptyInfo: ptyInfo?.name,
   });

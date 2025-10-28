@@ -284,6 +284,7 @@ export interface ConfigParameters {
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
   fakeResponses?: string;
+  recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
 }
@@ -383,6 +384,7 @@ export class Config {
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
   readonly fakeResponses?: string;
+  readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
 
   constructor(params: ConfigParameters) {
@@ -493,6 +495,7 @@ export class Config {
     this.extensionManagement = params.extensionManagement ?? true;
     this.storage = new Storage(this.targetDir);
     this.fakeResponses = params.fakeResponses;
+    this.recordResponses = params.recordResponses;
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
@@ -1100,6 +1103,11 @@ export class Config {
 
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this, this.eventEmitter);
+
+    // Set message bus on tool registry before discovery so MCP tools can access it
+    if (this.getEnableMessageBusIntegration()) {
+      registry.setMessageBus(this.messageBus);
+    }
 
     // helper to create & register core tools that are enabled
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -11,14 +11,16 @@ import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { quote, parse } from 'shell-quote';
-import {
-  USER_SETTINGS_DIR,
-  SETTINGS_DIRECTORY_NAME,
-} from '../config/settings.js';
+import { USER_SETTINGS_DIR } from '../config/settings.js';
 import { promisify } from 'node:util';
 import type { Config, SandboxConfig } from '@google/gemini-cli-core';
-import { FatalSandboxError } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  FatalSandboxError,
+  GEMINI_DIR,
+} from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
+import { randomBytes } from 'node:crypto';
 
 const execAsync = promisify(exec);
 
@@ -94,7 +96,7 @@ async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
     } catch (_err) {
       // Silently ignore if /etc/os-release is not found or unreadable.
       // The default (false) will be applied in this case.
-      console.warn(
+      debugLogger.warn(
         'Warning: Could not read /etc/os-release to auto-detect Debian/Ubuntu for UID/GID default.',
       );
     }
@@ -155,10 +157,7 @@ function entrypoint(workdir: string, cliArgs: string[]): string[] {
     shellCmds.push(`export PYTHONPATH="$PYTHONPATH${pythonPathSuffix}";`);
   }
 
-  const projectSandboxBashrc = path.join(
-    SETTINGS_DIRECTORY_NAME,
-    'sandbox.bashrc',
-  );
+  const projectSandboxBashrc = path.join(GEMINI_DIR, 'sandbox.bashrc');
   if (fs.existsSync(projectSandboxBashrc)) {
     shellCmds.push(`source ${getContainerPath(projectSandboxBashrc)};`);
   }
@@ -188,7 +187,7 @@ export async function start_sandbox(
   nodeArgs: string[] = [],
   cliConfig?: Config,
   cliArgs: string[] = [],
-) {
+): Promise<number> {
   const patcher = new ConsolePatcher({
     debugMode: cliConfig?.getDebugMode() || !!process.env['DEBUG'],
     stderr: true,
@@ -210,10 +209,7 @@ export async function start_sandbox(
       );
       // if profile name is not recognized, then look for file under project settings directory
       if (!BUILTIN_SEATBELT_PROFILES.includes(profile)) {
-        profileFile = path.join(
-          SETTINGS_DIRECTORY_NAME,
-          `sandbox-macos-${profile}.sb`,
-        );
+        profileFile = path.join(GEMINI_DIR, `sandbox-macos-${profile}.sb`);
       }
       if (!fs.existsSync(profileFile)) {
         throw new FatalSandboxError(
@@ -309,7 +305,7 @@ export async function start_sandbox(
         });
         // install handlers to stop proxy on exit/signal
         const stopProxy = () => {
-          console.log('stopping proxy ...');
+          debugLogger.log('stopping proxy ...');
           if (proxyProcess?.pid) {
             process.kill(-proxyProcess.pid, 'SIGTERM');
           }
@@ -333,17 +329,23 @@ export async function start_sandbox(
             `Proxy command '${proxyCommand}' exited with code ${code}, signal ${signal}`,
           );
         });
-        console.log('waiting for proxy to start ...');
+        debugLogger.log('waiting for proxy to start ...');
         await execAsync(
           `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
         );
       }
       // spawn child and let it inherit stdio
+      process.stdin.pause();
       sandboxProcess = spawn(config.command, args, {
         stdio: 'inherit',
       });
-      await new Promise((resolve) => sandboxProcess?.on('close', resolve));
-      return;
+      return new Promise((resolve, reject) => {
+        sandboxProcess?.on('error', reject);
+        sandboxProcess?.on('close', (code) => {
+          process.stdin.resume();
+          resolve(code ?? 1);
+        });
+      });
     }
 
     console.error(`hopping into sandbox (command: ${config.command}) ...`);
@@ -352,7 +354,7 @@ export async function start_sandbox(
     const gcPath = fs.realpathSync(process.argv[1]);
 
     const projectSandboxDockerfile = path.join(
-      SETTINGS_DIRECTORY_NAME,
+      GEMINI_DIR,
       'sandbox.Dockerfile',
     );
     const isCustomProjectSandbox = fs.existsSync(projectSandboxDockerfile);
@@ -376,7 +378,7 @@ export async function start_sandbox(
         // if project folder has sandbox.Dockerfile under project settings folder, use that
         let buildArgs = '';
         const projectSandboxDockerfile = path.join(
-          SETTINGS_DIRECTORY_NAME,
+          GEMINI_DIR,
           'sandbox.Dockerfile',
         );
         if (isCustomProjectSandbox) {
@@ -424,6 +426,9 @@ export async function start_sandbox(
       args.push('-t');
     }
 
+    // allow access to host.docker.internal
+    args.push('--add-host', 'host.docker.internal:host-gateway');
+
     // mount current directory as working directory in sandbox (set via --workdir)
     args.push('--volume', `${workdir}:${containerWorkdir}`);
 
@@ -431,7 +436,7 @@ export async function start_sandbox(
     // note user/home changes inside sandbox and we mount at BOTH paths for consistency
     const userSettingsDirOnHost = USER_SETTINGS_DIR;
     const userSettingsDirInSandbox = getContainerPath(
-      `/home/node/${SETTINGS_DIRECTORY_NAME}`,
+      `/home/node/${GEMINI_DIR}`,
     );
     if (!fs.existsSync(userSettingsDirOnHost)) {
       fs.mkdirSync(userSettingsDirOnHost);
@@ -549,19 +554,38 @@ export async function start_sandbox(
       }
     }
 
-    // name container after image, plus numeric suffix to avoid conflicts
+    // name container after image, plus random suffix to avoid conflicts
     const imageName = parseImageName(image);
-    let index = 0;
-    const containerNameCheck = execSync(
-      `${config.command} ps -a --format "{{.Names}}"`,
-    )
-      .toString()
-      .trim();
-    while (containerNameCheck.includes(`${imageName}-${index}`)) {
-      index++;
+    const isIntegrationTest =
+      process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true';
+    let containerName;
+    if (isIntegrationTest) {
+      containerName = `gemini-cli-integration-test-${randomBytes(4).toString(
+        'hex',
+      )}`;
+      debugLogger.log(`ContainerName: ${containerName}`);
+    } else {
+      let index = 0;
+      const containerNameCheck = execSync(
+        `${config.command} ps -a --format "{{.Names}}"`,
+      )
+        .toString()
+        .trim();
+      while (containerNameCheck.includes(`${imageName}-${index}`)) {
+        index++;
+      }
+      containerName = `${imageName}-${index}`;
+      debugLogger.log(`ContainerName (regular): ${containerName}`);
     }
-    const containerName = `${imageName}-${index}`;
     args.push('--name', containerName, '--hostname', containerName);
+
+    // copy GEMINI_CLI_TEST_VAR for integration tests
+    if (process.env['GEMINI_CLI_TEST_VAR']) {
+      args.push(
+        '--env',
+        `GEMINI_CLI_TEST_VAR=${process.env['GEMINI_CLI_TEST_VAR']}`,
+      );
+    }
 
     // copy GEMINI_API_KEY(s)
     if (process.env['GEMINI_API_KEY']) {
@@ -636,10 +660,7 @@ export async function start_sandbox(
         ?.toLowerCase()
         .startsWith(workdir.toLowerCase())
     ) {
-      const sandboxVenvPath = path.resolve(
-        SETTINGS_DIRECTORY_NAME,
-        'sandbox.venv',
-      );
+      const sandboxVenvPath = path.resolve(GEMINI_DIR, 'sandbox.venv');
       if (!fs.existsSync(sandboxVenvPath)) {
         fs.mkdirSync(sandboxVenvPath, { recursive: true });
       }
@@ -756,7 +777,7 @@ export async function start_sandbox(
       });
       // install handlers to stop proxy on exit/signal
       const stopProxy = () => {
-        console.log('stopping proxy container ...');
+        debugLogger.log('stopping proxy container ...');
         execSync(`${config.command} rm -f ${SANDBOX_PROXY_NAME}`);
       };
       process.on('exit', stopProxy);
@@ -778,7 +799,7 @@ export async function start_sandbox(
           `Proxy container command '${proxyContainerCommand}' exited with code ${code}, signal ${signal}`,
         );
       });
-      console.log('waiting for proxy to start ...');
+      debugLogger.log('waiting for proxy to start ...');
       await execAsync(
         `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
       );
@@ -790,22 +811,25 @@ export async function start_sandbox(
     }
 
     // spawn child and let it inherit stdio
+    process.stdin.pause();
     sandboxProcess = spawn(config.command, args, {
       stdio: 'inherit',
     });
 
-    sandboxProcess.on('error', (err) => {
-      console.error('Sandbox process error:', err);
-    });
+    return new Promise<number>((resolve, reject) => {
+      sandboxProcess.on('error', (err) => {
+        console.error('Sandbox process error:', err);
+        reject(err);
+      });
 
-    await new Promise<void>((resolve) => {
       sandboxProcess?.on('close', (code, signal) => {
-        if (code !== 0) {
-          console.log(
+        process.stdin.resume();
+        if (code !== 0 && code !== null) {
+          debugLogger.log(
             `Sandbox process exited with code: ${code}, signal: ${signal}`,
           );
         }
-        resolve();
+        resolve(code ?? 1);
       });
     });
   } finally {
@@ -827,7 +851,7 @@ async function imageExists(sandbox: string, image: string): Promise<boolean> {
     }
 
     checkProcess.on('error', (err) => {
-      console.warn(
+      debugLogger.warn(
         `Failed to start '${sandbox}' command for image check: ${err.message}`,
       );
       resolve(false);
@@ -862,7 +886,7 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
     };
 
     const onError = (err: Error) => {
-      console.warn(
+      debugLogger.warn(
         `Failed to start '${sandbox} pull ${image}' command: ${err.message}`,
       );
       cleanup();
@@ -875,7 +899,7 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
         cleanup();
         resolve(true);
       } else {
-        console.warn(
+        debugLogger.warn(
           `Failed to pull image ${image}. '${sandbox} pull ${image}' exited with code ${code}.`,
         );
         if (stderrData.trim()) {
@@ -933,7 +957,7 @@ async function ensureSandboxImageIsPresent(
       console.info(`Sandbox image ${image} is now available after pulling.`);
       return true;
     } else {
-      console.warn(
+      debugLogger.warn(
         `Sandbox image ${image} still not found after a pull attempt. This might indicate an issue with the image name or registry, or the pull command reported success but failed to make the image available.`,
       );
       return false;

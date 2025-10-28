@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { EOL } from 'node:os';
@@ -17,23 +18,62 @@ import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { fileExists } from '../utils/fileUtils.js';
 import { Storage } from '../config/storage.js';
+import { GREP_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const DEFAULT_TOTAL_MAX_MATCHES = 20000;
 
-function getRgPath() {
-  return path.join(Storage.getGlobalBinDir(), 'rg');
+function getRgCandidateFilenames(): readonly string[] {
+  return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
+}
+
+async function resolveExistingRgPath(): Promise<string | null> {
+  const binDir = Storage.getGlobalBinDir();
+  for (const fileName of getRgCandidateFilenames()) {
+    const candidatePath = path.join(binDir, fileName);
+    if (await fileExists(candidatePath)) {
+      return candidatePath;
+    }
+  }
+  return null;
+}
+
+let ripgrepAcquisitionPromise: Promise<string | null> | null = null;
+
+async function ensureRipgrepAvailable(): Promise<string | null> {
+  const existingPath = await resolveExistingRgPath();
+  if (existingPath) {
+    return existingPath;
+  }
+  if (!ripgrepAcquisitionPromise) {
+    ripgrepAcquisitionPromise = (async () => {
+      try {
+        await downloadRipGrep(Storage.getGlobalBinDir());
+        return await resolveExistingRgPath();
+      } finally {
+        ripgrepAcquisitionPromise = null;
+      }
+    })();
+  }
+  return ripgrepAcquisitionPromise;
 }
 
 /**
  * Checks if `rg` exists, if not then attempt to download it.
  */
 export async function canUseRipgrep(): Promise<boolean> {
-  if (await fileExists(getRgPath())) {
-    return true;
-  }
+  return (await ensureRipgrepAvailable()) !== null;
+}
 
-  await downloadRipGrep(Storage.getGlobalBinDir());
-  return await fileExists(getRgPath());
+/**
+ * Ensures `rg` is downloaded, or throws.
+ */
+export async function ensureRgPath(): Promise<string> {
+  const downloadedPath = await ensureRipgrepAvailable();
+  if (downloadedPath) {
+    return downloadedPath;
+  }
+  throw new Error('Cannot use ripgrep.');
 }
 
 /**
@@ -72,8 +112,11 @@ class GrepToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: RipGrepToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   /**
@@ -137,7 +180,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
 
       if (this.config.getDebugMode()) {
-        console.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
+        debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
 
       for (const searchDir of searchDirectories) {
@@ -310,8 +353,9 @@ class GrepToolInvocation extends BaseToolInvocation<
     rgArgs.push(absolutePath);
 
     try {
+      const rgPath = await ensureRgPath();
       const output = await new Promise<string>((resolve, reject) => {
-        const child = spawn(getRgPath(), rgArgs, {
+        const child = spawn(rgPath, rgArgs, {
           windowsHide: true,
         });
 
@@ -408,9 +452,12 @@ export class RipGrepTool extends BaseDeclarativeTool<
   RipGrepToolParams,
   ToolResult
 > {
-  static readonly Name = 'search_file_content';
+  static readonly Name = GREP_TOOL_NAME;
 
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
       RipGrepTool.Name,
       'SearchText',
@@ -437,6 +484,9 @@ export class RipGrepTool extends BaseDeclarativeTool<
         required: ['pattern'],
         type: 'object',
       },
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+      messageBus,
     );
   }
 
@@ -509,7 +559,16 @@ export class RipGrepTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: RipGrepToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<RipGrepToolParams, ToolResult> {
-    return new GrepToolInvocation(this.config, params);
+    return new GrepToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }

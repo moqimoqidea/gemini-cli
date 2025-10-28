@@ -17,7 +17,10 @@ import type {
   ServerGeminiToolCallRequestEvent,
   Config,
 } from '@google/gemini-cli-core';
-import { GeminiEventType } from '@google/gemini-cli-core';
+import {
+  GeminiEventType,
+  SimpleExtensionLoader,
+} from '@google/gemini-cli-core';
 import { v4 as uuidv4 } from 'uuid';
 
 import { logger } from '../utils/logger.js';
@@ -36,6 +39,7 @@ import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { Task } from './task.js';
 import { requestStorage } from '../http/requestStorage.js';
+import { pushTaskStateFailed } from '../utils/executor_utils.js';
 
 /**
  * Provides a wrapper for Task. Passes data from Task to SDKTask.
@@ -95,7 +99,11 @@ export class CoderAgentExecutor implements AgentExecutor {
     loadEnvironment(); // Will override any global env with workspace envs
     const settings = loadSettings(workspaceRoot);
     const extensions = loadExtensions(workspaceRoot);
-    return await loadConfig(settings, extensions, taskId);
+    return await loadConfig(
+      settings,
+      new SimpleExtensionLoader(extensions),
+      taskId,
+    );
   }
 
   /**
@@ -116,8 +124,8 @@ export class CoderAgentExecutor implements AgentExecutor {
 
     const agentSettings = persistedState._agentSettings;
     const config = await this.getConfig(agentSettings, sdkTask.id);
-    const contextId =
-      (metadata['_contextId'] as string) || (sdkTask.contextId as string);
+    const contextId: string =
+      (metadata['_contextId'] as string) || sdkTask.contextId;
     const runtimeTask = await Task.create(
       sdkTask.id,
       contextId,
@@ -280,10 +288,10 @@ export class CoderAgentExecutor implements AgentExecutor {
     const sdkTask = requestContext.task as SDKTask | undefined;
 
     const taskId = sdkTask?.id || userMessage.taskId || uuidv4();
-    const contextId =
+    const contextId: string =
       userMessage.contextId ||
       sdkTask?.contextId ||
-      sdkTask?.metadata?.['_contextId'] ||
+      (sdkTask?.metadata?.['_contextId'] as string) ||
       uuidv4();
 
     logger.info(
@@ -381,12 +389,21 @@ export class CoderAgentExecutor implements AgentExecutor {
       const agentSettings = userMessage.metadata?.[
         'coderAgent'
       ] as AgentSettings;
-      wrapper = await this.createTask(
-        taskId,
-        contextId as string,
-        agentSettings,
-        eventBus,
-      );
+      try {
+        wrapper = await this.createTask(
+          taskId,
+          contextId,
+          agentSettings,
+          eventBus,
+        );
+      } catch (error) {
+        logger.error(
+          `[CoderAgentExecutor] Error creating task ${taskId}:`,
+          error,
+        );
+        pushTaskStateFailed(error, eventBus, taskId, contextId);
+        return;
+      }
       const newTaskSDK = wrapper.toSDKTask();
       eventBus.publish({
         ...newTaskSDK,

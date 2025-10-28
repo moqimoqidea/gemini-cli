@@ -6,11 +6,19 @@
 
 import type { CommandModule } from 'yargs';
 import {
-  updateExtensionByName,
   updateAllUpdatableExtensions,
   type ExtensionUpdateInfo,
-} from '../../config/extension.js';
+  checkForAllExtensionUpdates,
+  updateExtension,
+} from '../../config/extensions/update.js';
+import { checkForExtensionUpdate } from '../../config/extensions/github.js';
 import { getErrorMessage } from '../../utils/errors.js';
+import { ExtensionUpdateState } from '../../ui/state/extensions.js';
+import { debugLogger } from '@google/gemini-cli-core';
+import { ExtensionManager } from '../../config/extension-manager.js';
+import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import { loadSettings } from '../../config/settings.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface UpdateArgs {
   name?: string;
@@ -21,32 +29,95 @@ const updateOutput = (info: ExtensionUpdateInfo) =>
   `Extension "${info.name}" successfully updated: ${info.originalVersion} → ${info.updatedVersion}.`;
 
 export async function handleUpdate(args: UpdateArgs) {
-  if (args.all) {
+  const workspaceDir = process.cwd();
+  const extensionManager = new ExtensionManager({
+    workspaceDir,
+    requestConsent: requestConsentNonInteractive,
+    requestSetting: promptForSetting,
+    settings: loadSettings(workspaceDir).merged,
+  });
+
+  const extensions = await extensionManager.loadExtensions();
+  if (args.name) {
     try {
-      const updateInfos = await updateAllUpdatableExtensions();
-      if (updateInfos.length === 0) {
-        console.log('No extensions to update.');
+      const extension = extensions.find(
+        (extension) => extension.name === args.name,
+      );
+      if (!extension) {
+        debugLogger.log(`Extension "${args.name}" not found.`);
         return;
       }
-      console.log(updateInfos.map((info) => updateOutput(info)).join('\n'));
+      if (!extension.installMetadata) {
+        debugLogger.log(
+          `Unable to install extension "${args.name}" due to missing install metadata`,
+        );
+        return;
+      }
+      const updateState = await checkForExtensionUpdate(
+        extension,
+        extensionManager,
+      );
+      if (updateState !== ExtensionUpdateState.UPDATE_AVAILABLE) {
+        debugLogger.log(`Extension "${args.name}" is already up to date.`);
+        return;
+      }
+      // TODO(chrstnb): we should list extensions if the requested extension is not installed.
+      const updatedExtensionInfo = (await updateExtension(
+        extension,
+        extensionManager,
+        updateState,
+        () => {},
+      ))!;
+      if (
+        updatedExtensionInfo.originalVersion !==
+        updatedExtensionInfo.updatedVersion
+      ) {
+        debugLogger.log(
+          `Extension "${args.name}" successfully updated: ${updatedExtensionInfo.originalVersion} → ${updatedExtensionInfo.updatedVersion}.`,
+        );
+      } else {
+        debugLogger.log(`Extension "${args.name}" is already up to date.`);
+      }
     } catch (error) {
-      console.error(getErrorMessage(error));
+      debugLogger.error(getErrorMessage(error));
     }
   }
-  if (args.name)
+  if (args.all) {
     try {
-      // TODO(chrstnb): we should list extensions if the requested extension is not installed.
-      const updatedExtensionInfo = await updateExtensionByName(args.name);
-      console.log(
-        `Extension "${args.name}" successfully updated: ${updatedExtensionInfo.originalVersion} → ${updatedExtensionInfo.updatedVersion}.`,
+      const extensionState = new Map();
+      await checkForAllExtensionUpdates(
+        extensions,
+        extensionManager,
+        (action) => {
+          if (action.type === 'SET_STATE') {
+            extensionState.set(action.payload.name, {
+              status: action.payload.state,
+            });
+          }
+        },
       );
+      let updateInfos = await updateAllUpdatableExtensions(
+        extensions,
+        extensionState,
+        extensionManager,
+        () => {},
+      );
+      updateInfos = updateInfos.filter(
+        (info) => info.originalVersion !== info.updatedVersion,
+      );
+      if (updateInfos.length === 0) {
+        debugLogger.log('No extensions to update.');
+        return;
+      }
+      debugLogger.log(updateInfos.map((info) => updateOutput(info)).join('\n'));
     } catch (error) {
-      console.error(getErrorMessage(error));
+      debugLogger.error(getErrorMessage(error));
     }
+  }
 }
 
 export const updateCommand: CommandModule = {
-  command: 'update [--all] [name]',
+  command: 'update [<name>] [--all]',
   describe:
     'Updates all extensions or a named extension to the latest version.',
   builder: (yargs) =>

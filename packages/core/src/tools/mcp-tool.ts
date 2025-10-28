@@ -20,6 +20,7 @@ import {
 import type { CallableTool, FunctionCall, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
 import type { Config } from '../config/config.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -71,11 +72,15 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     readonly trust?: boolean,
     params: ToolParams = {},
     private readonly cliConfig?: Config,
+    messageBus?: MessageBus,
   ) {
-    super(params);
+    // Use composite format for policy checks: serverName__toolName
+    // This enables server wildcards (e.g., "google-workspace__*")
+    // while still allowing specific tool rules
+    super(params, messageBus, `${serverName}__${serverToolName}`, displayName);
   }
 
-  override async shouldConfirmExecute(
+  protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const serverAllowListKey = this.serverName;
@@ -131,7 +136,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     return false;
   }
 
-  async execute(): Promise<ToolResult> {
+  async execute(signal: AbortSignal): Promise<ToolResult> {
     const functionCalls: FunctionCall[] = [
       {
         name: this.serverToolName,
@@ -139,7 +144,36 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       },
     ];
 
-    const rawResponseParts = await this.mcpTool.callTool(functionCalls);
+    // Race MCP tool call with abort signal to respect cancellation
+    const rawResponseParts = await new Promise<Part[]>((resolve, reject) => {
+      if (signal.aborted) {
+        const error = new Error('Tool call aborted');
+        error.name = 'AbortError';
+        reject(error);
+        return;
+      }
+      const onAbort = () => {
+        cleanup();
+        const error = new Error('Tool call aborted');
+        error.name = 'AbortError';
+        reject(error);
+      };
+      const cleanup = () => {
+        signal.removeEventListener('abort', onAbort);
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+
+      this.mcpTool
+        .callTool(functionCalls)
+        .then((res) => {
+          cleanup();
+          resolve(res);
+        })
+        .catch((err) => {
+          cleanup();
+          reject(err);
+        });
+    });
 
     // Ensure the response is not an error
     if (this.isMCPToolError(rawResponseParts)) {
@@ -184,6 +218,8 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     readonly trust?: boolean,
     nameOverride?: string,
     private readonly cliConfig?: Config,
+    override readonly extensionId?: string,
+    messageBus?: MessageBus,
   ) {
     super(
       nameOverride ?? generateValidName(serverToolName),
@@ -192,7 +228,9 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       Kind.Other,
       parameterSchema,
       true, // isOutputMarkdown
-      false, // canUpdateOutput
+      false, // canUpdateOutput,
+      messageBus,
+      extensionId,
     );
   }
 
@@ -206,11 +244,16 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.trust,
       `${this.serverName}__${this.serverToolName}`,
       this.cliConfig,
+      this.extensionId,
+      this.messageBus,
     );
   }
 
   protected createInvocation(
     params: ToolParams,
+    _messageBus?: MessageBus,
+    _toolName?: string,
+    _displayName?: string,
   ): ToolInvocation<ToolParams, ToolResult> {
     return new DiscoveredMCPToolInvocation(
       this.mcpTool,
@@ -220,6 +263,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.trust,
       params,
       this.cliConfig,
+      _messageBus,
     );
   }
 }

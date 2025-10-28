@@ -131,7 +131,15 @@ async function startPtyProcess(mainWindow: BrowserWindow) {
   const sessionId = crypto.randomUUID();
   setupFileWatcher(mainWindow);
 
-  const cliPath = join(__dirname, '..', '..', '..', 'cli', 'dist', 'index.js');
+  const cliPath = join(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    '..',
+    'bundle',
+    'gemini.js',
+  );
 
   console.log(`[PTY] Starting PTY process with CLI path: ${cliPath}`);
 
@@ -180,6 +188,7 @@ async function startPtyProcess(mainWindow: BrowserWindow) {
     const outputBuffer: string[] = [];
 
     ptyProcess.onExit(({ exitCode, signal }) => {
+      ptyProcess = null;
       console.log(
         `[PTY] Process exited with code ${exitCode} and signal ${signal}`,
       );
@@ -329,7 +338,11 @@ async function createWindow() {
     });
 
     ipcMain.on('terminal.keystroke', (_event, key) => {
-      ptyProcess?.write(key);
+      try {
+        ptyProcess?.write(key);
+      } catch (error) {
+        console.warn('[PTY] Failed to write to PTY:', error);
+      }
     });
 
     ipcMain.on(
@@ -337,8 +350,12 @@ async function createWindow() {
       (_event, size: { cols: number; rows: number }) => {
         if (size.cols !== prevResize[0] || size.rows !== prevResize[1]) {
           console.log(`Resizing terminal to ${size.cols}x${size.rows}`);
-          ptyProcess?.resize(size.cols, size.rows);
-          prevResize = [size.cols, size.rows];
+          try {
+            ptyProcess?.resize(size.cols, size.rows);
+            prevResize = [size.cols, size.rows];
+          } catch (error) {
+            console.warn('[PTY] Failed to resize PTY:', error);
+          }
         }
       },
     );

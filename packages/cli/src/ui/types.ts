@@ -6,6 +6,8 @@
 
 import type {
   CompressionStatus,
+  GeminiCLIExtension,
+  MCPServerConfig,
   ThoughtSummary,
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
@@ -66,6 +68,7 @@ export interface IndividualToolCallDisplay {
   status: ToolCallStatus;
   confirmationDetails: ToolCallConfirmationDetails | undefined;
   renderOutputAsMarkdown?: boolean;
+  ptyId?: number;
   outputFile?: string;
 }
 
@@ -102,6 +105,11 @@ export type HistoryItemInfo = HistoryItemBase & {
 
 export type HistoryItemError = HistoryItemBase & {
   type: 'error';
+  text: string;
+};
+
+export type HistoryItemWarning = HistoryItemBase & {
+  type: 'warning';
   text: string;
 };
 
@@ -154,6 +162,67 @@ export type HistoryItemCompression = HistoryItemBase & {
   compression: CompressionProps;
 };
 
+export type HistoryItemExtensionsList = HistoryItemBase & {
+  type: 'extensions_list';
+  extensions: GeminiCLIExtension[];
+};
+
+export interface ChatDetail {
+  name: string;
+  mtime: string;
+}
+
+export type HistoryItemChatList = HistoryItemBase & {
+  type: 'chat_list';
+  chats: ChatDetail[];
+};
+
+export interface ToolDefinition {
+  name: string;
+  displayName: string;
+  description?: string;
+}
+
+export type HistoryItemToolsList = HistoryItemBase & {
+  type: 'tools_list';
+  tools: ToolDefinition[];
+  showDescriptions: boolean;
+};
+
+// JSON-friendly types for using as a simple data model showing info about an
+// MCP Server.
+export interface JsonMcpTool {
+  serverName: string;
+  name: string;
+  description?: string;
+  schema?: {
+    parametersJsonSchema?: unknown;
+    parameters?: unknown;
+  };
+}
+
+export interface JsonMcpPrompt {
+  serverName: string;
+  name: string;
+  description?: string;
+}
+
+export type HistoryItemMcpStatus = HistoryItemBase & {
+  type: 'mcp_status';
+  servers: Record<string, MCPServerConfig>;
+  tools: JsonMcpTool[];
+  prompts: JsonMcpPrompt[];
+  authStatus: Record<
+    string,
+    'authenticated' | 'expired' | 'unauthenticated' | 'not-configured'
+  >;
+  blockedServers: Array<{ name: string; extensionName: string }>;
+  discoveryInProgress: boolean;
+  connectingServers: string[];
+  showDescriptions: boolean;
+  showSchema: boolean;
+};
+
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
 // type inference e.g. historyItem.type === 'tool_group' isn't auto-inferring that
 // 'tools' in historyItem.
@@ -165,6 +234,7 @@ export type HistoryItemWithoutId =
   | HistoryItemGeminiContent
   | HistoryItemInfo
   | HistoryItemError
+  | HistoryItemWarning
   | HistoryItemAbout
   | HistoryItemHelp
   | HistoryItemToolGroup
@@ -172,7 +242,11 @@ export type HistoryItemWithoutId =
   | HistoryItemModelStats
   | HistoryItemToolStats
   | HistoryItemQuit
-  | HistoryItemCompression;
+  | HistoryItemCompression
+  | HistoryItemExtensionsList
+  | HistoryItemToolsList
+  | HistoryItemMcpStatus
+  | HistoryItemChatList;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -180,6 +254,7 @@ export type HistoryItem = HistoryItemWithoutId & { id: number };
 export enum MessageType {
   INFO = 'info',
   ERROR = 'error',
+  WARNING = 'warning',
   USER = 'user',
   ABOUT = 'about',
   HELP = 'help',
@@ -189,6 +264,10 @@ export enum MessageType {
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',
+  EXTENSIONS_LIST = 'extensions_list',
+  TOOLS_LIST = 'tools_list',
+  MCP_STATUS = 'mcp_status',
+  CHAT_LIST = 'chat_list',
 }
 
 // Simplified message structure for internal feedback
@@ -283,4 +362,8 @@ export interface ShellConfirmationRequest {
 export interface ConfirmationRequest {
   prompt: ReactNode;
   onConfirm: (confirm: boolean) => void;
+}
+
+export interface LoopDetectionConfirmationRequest {
+  onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
 }

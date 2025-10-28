@@ -21,6 +21,7 @@ import {
   MINIMUM_MAX_HEIGHT,
 } from '../components/shared/MaxSizedBox.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 // Configure theming and parsing utilities.
 const lowlight = createLowlight(common);
@@ -31,8 +32,9 @@ function renderHastNode(
   inheritedColor: string | undefined,
 ): React.ReactNode {
   if (node.type === 'text') {
-    // Use the color passed down from parent element, if any
-    return <Text color={inheritedColor}>{node.value}</Text>;
+    // Use the color passed down from parent element, or the theme's default.
+    const color = inheritedColor || theme.defaultColor;
+    return <Text color={color}>{node.value}</Text>;
   }
 
   // Handle Element Nodes: Determine color and pass it down, don't wrap
@@ -131,10 +133,13 @@ export function colorizeCode(
   maxWidth?: number,
   theme?: Theme,
   settings?: LoadedSettings,
+  hideLineNumbers?: boolean,
 ): React.ReactNode {
   const codeToHighlight = code.replace(/\n$/, '');
   const activeTheme = theme || themeManager.getActiveTheme();
-  const showLineNumbers = settings?.merged.ui?.showLineNumbers ?? true;
+  const showLineNumbers = hideLineNumbers
+    ? false
+    : (settings?.merged.ui?.showLineNumbers ?? true);
 
   try {
     // Render the HAST tree using the adapted theme
@@ -187,7 +192,7 @@ export function colorizeCode(
       </MaxSizedBox>
     );
   } catch (error) {
-    console.error(
+    debugLogger.warn(
       `[colorizeCode] Error highlighting code for language "${language}":`,
       error,
     );

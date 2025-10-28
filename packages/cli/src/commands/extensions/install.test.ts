@@ -9,12 +9,17 @@ import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
 import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import type { ExtensionManager } from '../../config/extension-manager.js';
+import type { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import type * as fs from 'node:fs/promises';
+import type { Stats } from 'node:fs';
 
 const mockInstallOrUpdateExtension: Mock<
   typeof ExtensionManager.prototype.installOrUpdateExtension
 > = vi.hoisted(() => vi.fn());
-const mockRequestConsentNonInteractive = vi.hoisted(() => vi.fn());
-const mockStat = vi.hoisted(() => vi.fn());
+const mockRequestConsentNonInteractive: Mock<
+  typeof requestConsentNonInteractive
+> = vi.hoisted(() => vi.fn());
+const mockStat: Mock<typeof fs.stat> = vi.hoisted(() => vi.fn());
 
 vi.mock('../../config/extensions/consent.js', () => ({
   requestConsentNonInteractive: mockRequestConsentNonInteractive,
@@ -142,7 +147,7 @@ describe('handleInstall', () => {
     mockInstallOrUpdateExtension.mockResolvedValue({
       name: 'local-extension',
     } as unknown as GeminiCLIExtension);
-    mockStat.mockResolvedValue({});
+    mockStat.mockResolvedValue({} as Stats);
     await handleInstall({
       source: '/some/path',
     });

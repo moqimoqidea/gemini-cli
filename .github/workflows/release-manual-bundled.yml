@@ -115,7 +115,7 @@ jobs:
           CLI_PACKAGE_NAME: '${{ vars.CLI_PACKAGE_NAME }}'
           RELEASE_VERSION: '${{ steps.release_info.outputs.RELEASE_VERSION }}'
         run: |
-          npx -y ${CLI_PACKAGE_NAME}@${RELEASE_VERSION} --version
+          npx -y "${CLI_PACKAGE_NAME}"@"${RELEASE_VERSION}" --version
 
       - name: '🎉 Create GitHub Release'
         working-directory: './release'

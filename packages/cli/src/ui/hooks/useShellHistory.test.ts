@@ -96,13 +96,17 @@ describe('useShellHistory', () => {
 
   it('should initialize and read the history file from the correct path', async () => {
     mockedFs.readFile.mockResolvedValue('cmd1\ncmd2');
-    const { result } = renderHook(() => useShellHistory(MOCKED_PROJECT_ROOT));
+    const { result, unmount } = renderHook(() =>
+      useShellHistory(MOCKED_PROJECT_ROOT),
+    );
 
-    await vi.waitFor(() => {
-      expect(mockedFs.readFile).toHaveBeenCalledWith(
-        MOCKED_HISTORY_FILE,
-        'utf-8',
-      );
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mockedFs.readFile).toHaveBeenCalledWith(
+          MOCKED_HISTORY_FILE,
+          'utf-8',
+        );
+      });
     });
 
     let command: string | null = null;
@@ -112,6 +116,10 @@ describe('useShellHistory', () => {
 
     // History is loaded newest-first: ['cmd2', 'cmd1']
     expect(command).toBe('cmd2');
+
+    await act(async () => {
+      unmount();
+    });
   });
 
   it('should handle a nonexistent history file gracefully', async () => {
@@ -119,10 +127,14 @@ describe('useShellHistory', () => {
     error.code = 'ENOENT';
     mockedFs.readFile.mockRejectedValue(error);
 
-    const { result } = renderHook(() => useShellHistory(MOCKED_PROJECT_ROOT));
+    const { result, unmount } = renderHook(() =>
+      useShellHistory(MOCKED_PROJECT_ROOT),
+    );
 
-    await vi.waitFor(() => {
-      expect(mockedFs.readFile).toHaveBeenCalled();
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mockedFs.readFile).toHaveBeenCalled();
+      });
     });
 
     let command: string | null = null;
@@ -131,27 +143,37 @@ describe('useShellHistory', () => {
     });
 
     expect(command).toBe(null);
+
+    await act(async () => {
+      unmount();
+    });
   });
 
   it('should add a command and write to the history file', async () => {
-    const { result } = renderHook(() => useShellHistory(MOCKED_PROJECT_ROOT));
+    const { result, unmount } = renderHook(() =>
+      useShellHistory(MOCKED_PROJECT_ROOT),
+    );
 
-    await vi.waitFor(() => {
-      expect(mockedFs.readFile).toHaveBeenCalled();
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mockedFs.readFile).toHaveBeenCalled();
+      });
     });
 
     act(() => {
       result.current.addCommandToHistory('new_command');
     });
 
-    await vi.waitFor(() => {
-      expect(mockedFs.mkdir).toHaveBeenCalledWith(MOCKED_HISTORY_DIR, {
-        recursive: true,
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mockedFs.mkdir).toHaveBeenCalledWith(MOCKED_HISTORY_DIR, {
+          recursive: true,
+        });
+        expect(mockedFs.writeFile).toHaveBeenCalledWith(
+          MOCKED_HISTORY_FILE,
+          'new_command', // Written to file oldest-first.
+        );
       });
-      expect(mockedFs.writeFile).toHaveBeenCalledWith(
-        MOCKED_HISTORY_FILE,
-        'new_command', // Written to file oldest-first.
-      );
     });
 
     let command: string | null = null;
@@ -159,15 +181,23 @@ describe('useShellHistory', () => {
       command = result.current.getPreviousCommand();
     });
     expect(command).toBe('new_command');
+
+    await act(async () => {
+      unmount();
+    });
   });
 
   it('should navigate history correctly with previous/next commands', async () => {
     mockedFs.readFile.mockResolvedValue('cmd1\ncmd2\ncmd3');
-    const { result } = renderHook(() => useShellHistory(MOCKED_PROJECT_ROOT));
+    const { result, unmount } = renderHook(() =>
+      useShellHistory(MOCKED_PROJECT_ROOT),
+    );
 
     // Wait for history to be loaded: ['cmd3', 'cmd2', 'cmd1']
-    await vi.waitFor(() => {
-      expect(mockedFs.readFile).toHaveBeenCalled();
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mockedFs.readFile).toHaveBeenCalled();
+      });
     });
 
     let command: string | null = null;
@@ -208,13 +238,21 @@ describe('useShellHistory', () => {
       command = result.current.getNextCommand();
     });
     expect(command).toBe('');
+
+    await act(async () => {
+      unmount();
+    });
   });
 
   it('should not add empty or whitespace-only commands to history', async () => {
-    const { result } = renderHook(() => useShellHistory(MOCKED_PROJECT_ROOT));
+    const { result, unmount } = renderHook(() =>
+      useShellHistory(MOCKED_PROJECT_ROOT),
+    );
 
-    await vi.waitFor(() => {
-      expect(mockedFs.readFile).toHaveBeenCalled();
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mockedFs.readFile).toHaveBeenCalled();
+      });
     });
 
     act(() => {
@@ -222,15 +260,23 @@ describe('useShellHistory', () => {
     });
 
     expect(mockedFs.writeFile).not.toHaveBeenCalled();
+
+    await act(async () => {
+      unmount();
+    });
   });
 
   it('should truncate history to MAX_HISTORY_LENGTH (100)', async () => {
     const oldCommands = Array.from({ length: 120 }, (_, i) => `old_cmd_${i}`);
     mockedFs.readFile.mockResolvedValue(oldCommands.join('\n'));
 
-    const { result } = renderHook(() => useShellHistory(MOCKED_PROJECT_ROOT));
-    await vi.waitFor(() => {
-      expect(mockedFs.readFile).toHaveBeenCalled();
+    const { result, unmount } = renderHook(() =>
+      useShellHistory(MOCKED_PROJECT_ROOT),
+    );
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mockedFs.readFile).toHaveBeenCalled();
+      });
     });
 
     act(() => {
@@ -238,8 +284,10 @@ describe('useShellHistory', () => {
     });
 
     // Wait for the async write to happen and then inspect the arguments.
-    await vi.waitFor(() => {
-      expect(mockedFs.writeFile).toHaveBeenCalled();
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mockedFs.writeFile).toHaveBeenCalled();
+      });
     });
 
     // The hook stores history newest-first.
@@ -252,15 +300,23 @@ describe('useShellHistory', () => {
     expect(writtenLines.length).toBe(100);
     expect(writtenLines[0]).toBe('old_cmd_21'); // New oldest command
     expect(writtenLines[99]).toBe('new_cmd'); // Newest command
+
+    await act(async () => {
+      unmount();
+    });
   });
 
   it('should move an existing command to the top when re-added', async () => {
     mockedFs.readFile.mockResolvedValue('cmd1\ncmd2\ncmd3');
-    const { result } = renderHook(() => useShellHistory(MOCKED_PROJECT_ROOT));
+    const { result, unmount } = renderHook(() =>
+      useShellHistory(MOCKED_PROJECT_ROOT),
+    );
 
     // Initial state: ['cmd3', 'cmd2', 'cmd1']
-    await vi.waitFor(() => {
-      expect(mockedFs.readFile).toHaveBeenCalled();
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mockedFs.readFile).toHaveBeenCalled();
+      });
     });
 
     act(() => {
@@ -270,13 +326,19 @@ describe('useShellHistory', () => {
     // After re-adding 'cmd1': ['cmd1', 'cmd3', 'cmd2']
     expect(mockedFs.readFile).toHaveBeenCalled();
 
-    await vi.waitFor(() => {
-      expect(mockedFs.writeFile).toHaveBeenCalled();
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mockedFs.writeFile).toHaveBeenCalled();
+      });
     });
 
     const writtenContent = mockedFs.writeFile.mock.calls[0][1] as string;
     const writtenLines = writtenContent.split('\n');
 
     expect(writtenLines).toEqual(['cmd2', 'cmd3', 'cmd1']);
+
+    await act(async () => {
+      unmount();
+    });
   });
 });

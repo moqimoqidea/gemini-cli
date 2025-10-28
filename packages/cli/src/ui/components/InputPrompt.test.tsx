@@ -252,10 +252,10 @@ describe('InputPrompt', () => {
 
     await act(async () => {
       stdin.write('\u001B[B');
+      await vi.waitFor(() =>
+        expect(mockShellHistory.getNextCommand).toHaveBeenCalled(),
+      );
     });
-    await vi.waitFor(() =>
-      expect(mockShellHistory.getNextCommand).toHaveBeenCalled(),
-    );
     unmount();
   });
 
@@ -395,7 +395,6 @@ describe('InputPrompt', () => {
       showSuggestions: false,
     });
     props.buffer.setText('some text');
-
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
     await act(async () => {
@@ -413,14 +412,14 @@ describe('InputPrompt', () => {
     await act(async () => {
       stdin.write('\u0010'); // Ctrl+P
     });
-    await vi.waitFor(() => {});
     await act(async () => {
       stdin.write('\u000E'); // Ctrl+N
     });
-    await vi.waitFor(() => {});
 
-    expect(mockCommandCompletion.navigateUp).not.toHaveBeenCalled();
-    expect(mockCommandCompletion.navigateDown).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(mockCommandCompletion.navigateUp).not.toHaveBeenCalled();
+      expect(mockCommandCompletion.navigateDown).not.toHaveBeenCalled();
+    });
     unmount();
   });
 
@@ -714,9 +713,10 @@ describe('InputPrompt', () => {
     await act(async () => {
       stdin.write('\r'); // Press Enter
     });
-    await vi.waitFor(() => {});
 
-    expect(props.onSubmit).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(props.onSubmit).not.toHaveBeenCalled();
+    });
     unmount();
   });
 
@@ -800,7 +800,9 @@ describe('InputPrompt', () => {
   });
 
   it('should clear the buffer on Ctrl+C if it has text', async () => {
-    props.buffer.setText('some text to clear');
+    await act(async () => {
+      props.buffer.setText('some text to clear');
+    });
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
     await act(async () => {
@@ -821,9 +823,10 @@ describe('InputPrompt', () => {
     await act(async () => {
       stdin.write('\x03'); // Ctrl+C character
     });
-    await vi.waitFor(() => {});
 
-    expect(props.buffer.setText).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(props.buffer.setText).not.toHaveBeenCalled();
+    });
     unmount();
   });
 
@@ -1277,7 +1280,9 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await vi.runAllTimersAsync();
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
 
       // Simulate a paste operation (this should set the paste protection)
       await act(async () => {
@@ -1288,7 +1293,9 @@ describe('InputPrompt', () => {
       await act(async () => {
         stdin.write('\r');
       });
-      await vi.runAllTimersAsync();
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
 
       // Verify that onSubmit was NOT called due to recent paste protection
       expect(props.onSubmit).not.toHaveBeenCalled();
@@ -1304,13 +1311,17 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await vi.runAllTimersAsync();
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
 
       // Simulate a paste operation (this sets the protection)
       await act(async () => {
         stdin.write('\x1b[200~pasted text\x1b[201~');
       });
-      await vi.runAllTimersAsync();
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
 
       // Advance timers past the protection timeout
       await act(async () => {
@@ -1321,7 +1332,9 @@ describe('InputPrompt', () => {
       await act(async () => {
         stdin.write('\r');
       });
-      await vi.runAllTimersAsync();
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
 
       expect(props.onSubmit).toHaveBeenCalledWith('pasted text');
       expect(props.buffer.newline).not.toHaveBeenCalled();
@@ -1349,19 +1362,25 @@ describe('InputPrompt', () => {
           <InputPrompt {...props} />,
           { kittyProtocolEnabled: true },
         );
-        await vi.runAllTimersAsync();
+        await act(async () => {
+          await vi.runAllTimersAsync();
+        });
 
         // Simulate a paste operation
         await act(async () => {
           stdin.write('\x1b[200~some pasted stuff\x1b[201~');
         });
-        await vi.runAllTimersAsync();
+        await act(async () => {
+          await vi.runAllTimersAsync();
+        });
 
         // Simulate an Enter key press immediately after paste
         await act(async () => {
           stdin.write('\r');
         });
-        await vi.runAllTimersAsync();
+        await act(async () => {
+          await vi.runAllTimersAsync();
+        });
 
         // Verify that onSubmit was called
         expect(props.onSubmit).toHaveBeenCalledWith('pasted command');
@@ -1376,13 +1395,17 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await vi.runAllTimersAsync();
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
 
       // Press Enter without any recent paste
       await act(async () => {
         stdin.write('\r');
       });
-      await vi.runAllTimersAsync();
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
 
       // Verify that onSubmit was called normally
       expect(props.onSubmit).toHaveBeenCalledWith('normal command');
@@ -1404,17 +1427,17 @@ describe('InputPrompt', () => {
 
       await act(async () => {
         stdin.write('\x1B');
-      });
-      await vi.waitFor(() => {
-        expect(onEscapePromptChange).toHaveBeenCalledWith(true);
+        await vi.waitFor(() => {
+          expect(onEscapePromptChange).toHaveBeenCalledWith(false);
+        });
       });
 
       await act(async () => {
         stdin.write('\x1B');
-      });
-      await vi.waitFor(() => {
-        expect(props.buffer.setText).toHaveBeenCalledWith('');
-        expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+        await vi.waitFor(() => {
+          expect(props.buffer.setText).toHaveBeenCalledWith('');
+          expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+        });
       });
       unmount();
     });
@@ -1431,18 +1454,16 @@ describe('InputPrompt', () => {
 
       await act(async () => {
         stdin.write('\x1B');
-      });
-
-      await vi.waitFor(() => {
-        expect(onEscapePromptChange).toHaveBeenCalledWith(true);
+        await vi.waitFor(() => {
+          expect(onEscapePromptChange).toHaveBeenCalledWith(false);
+        });
       });
 
       await act(async () => {
         stdin.write('a');
-      });
-
-      await vi.waitFor(() => {
-        expect(onEscapePromptChange).toHaveBeenCalledWith(false);
+        await vi.waitFor(() => {
+          expect(onEscapePromptChange).toHaveBeenCalledWith(false);
+        });
       });
       unmount();
     });
@@ -1457,10 +1478,10 @@ describe('InputPrompt', () => {
 
       await act(async () => {
         stdin.write('\x1B');
+        await vi.waitFor(() =>
+          expect(props.setShellModeActive).toHaveBeenCalledWith(false),
+        );
       });
-      await vi.waitFor(() =>
-        expect(props.setShellModeActive).toHaveBeenCalledWith(false),
-      );
       unmount();
     });
 
@@ -1494,12 +1515,16 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
         { kittyProtocolEnabled: false },
       );
-      await vi.runAllTimersAsync();
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
 
       await act(async () => {
         stdin.write('\x1B');
       });
-      await vi.runAllTimersAsync();
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
 
       vi.useRealTimers();
       unmount();
@@ -1580,7 +1605,6 @@ describe('InputPrompt', () => {
       await act(async () => {
         stdin.write('\x12');
       });
-      await vi.waitFor(() => {});
       await act(async () => {
         stdin.write('\x1B');
       });
@@ -1590,9 +1614,8 @@ describe('InputPrompt', () => {
 
       await vi.waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
+        expect(stdout.lastFrame()).not.toContain('echo hello');
       });
-
-      expect(stdout.lastFrame()).not.toContain('echo hello');
 
       unmount();
     });

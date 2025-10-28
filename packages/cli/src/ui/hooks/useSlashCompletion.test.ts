@@ -5,12 +5,34 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import { act, useState } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
-import { useState } from 'react';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
+import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
+
+const mockBuiltinLoadCommands = vi.fn();
+vi.mock('../../services/BuiltinCommandLoader.js', () => ({
+  BuiltinCommandLoader: vi.fn().mockImplementation(() => ({
+    loadCommands: mockBuiltinLoadCommands,
+  })),
+}));
+
+const mockFileLoadCommands = vi.fn();
+vi.mock('../../services/FileCommandLoader.js', () => ({
+  FileCommandLoader: vi.fn().mockImplementation(() => ({
+    loadCommands: mockFileLoadCommands,
+  })),
+}));
+
+const mockMcpLoadCommands = vi.fn();
+vi.mock('../../services/McpPromptLoader.js', () => ({
+  McpPromptLoader: vi.fn().mockImplementation(() => ({
+    loadCommands: mockMcpLoadCommands,
+  })),
+}));
 
 // Test utility type and helper function for creating test SlashCommands
 type TestSlashCommand = Omit<SlashCommand, 'kind'> &
@@ -22,6 +44,19 @@ function createTestCommand(command: TestSlashCommand): SlashCommand {
     ...command,
   };
 }
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.clearAllMocks();
+  vi.mocked(BuiltinCommandLoader).mockClear();
+  mockBuiltinLoadCommands.mockResolvedValue([]);
+  mockFileLoadCommands.mockResolvedValue([]);
+  mockMcpLoadCommands.mockResolvedValue([]);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 // Track AsyncFzf constructor calls for cache testing
 let asyncFzfConstructorCalls = 0;
@@ -194,7 +229,7 @@ describe('useSlashCompletion', () => {
         }),
         createTestCommand({ name: 'chat', description: 'Manage chat history' }),
       ];
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/',
@@ -203,11 +238,23 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions.length).toBe(slashCommands.length);
-        expect(result.current.suggestions.map((s) => s.label)).toEqual(
-          expect.arrayContaining(['help', 'clear', 'memory', 'chat', 'stats']),
-        );
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions.length).toBe(slashCommands.length);
+          expect(result.current.suggestions.map((s) => s.label)).toEqual(
+            expect.arrayContaining([
+              'help',
+              'clear',
+              'memory',
+              'chat',
+              'stats',
+            ]),
+          );
+        });
+      });
+
+      await act(async () => {
+        unmount();
       });
     });
 
@@ -215,7 +262,7 @@ describe('useSlashCompletion', () => {
       const slashCommands = [
         createTestCommand({ name: 'memory', description: 'Manage memory' }),
       ];
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/mem',
@@ -224,15 +271,26 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions).toEqual([
-          {
-            label: 'memory',
-            value: 'memory',
-            description: 'Manage memory',
-            commandKind: CommandKind.BUILT_IN,
-          },
-        ]);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions.length).toBeGreaterThan(0);
+          expect(result.current.suggestions).toEqual([
+            {
+              label: 'memory',
+              value: 'memory',
+              description: 'Manage memory',
+              commandKind: CommandKind.BUILT_IN,
+            },
+          ]);
+        });
+      });
+
+      await act(async () => {
+        unmount();
       });
     });
 
@@ -244,7 +302,7 @@ describe('useSlashCompletion', () => {
           description: 'check session stats. Usage: /stats [model|tools]',
         }),
       ];
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/usag',
@@ -253,15 +311,25 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions).toEqual([
-          {
-            label: 'stats',
-            value: 'stats',
-            description: 'check session stats. Usage: /stats [model|tools]',
-            commandKind: CommandKind.BUILT_IN,
-          },
-        ]);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions).toEqual([
+            {
+              label: 'stats',
+              value: 'stats',
+              description: 'check session stats. Usage: /stats [model|tools]',
+              commandKind: CommandKind.BUILT_IN,
+            },
+          ]);
+        });
+      });
+
+      await act(async () => {
+        unmount();
       });
     });
 
@@ -273,7 +341,7 @@ describe('useSlashCompletion', () => {
           action: vi.fn(),
         }),
       ];
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/clear',
@@ -282,7 +350,19 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toHaveLength(0);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions).toHaveLength(0);
+        });
+      });
+
+      await act(async () => {
+        unmount();
+      });
     });
 
     it.each([['/?'], ['/usage']])(
@@ -303,7 +383,7 @@ describe('useSlashCompletion', () => {
           }),
         ];
 
-        const { result } = renderHook(() =>
+        const { result, unmount } = renderHook(() =>
           useTestHarnessForSlashCompletion(
             true,
             query,
@@ -312,7 +392,19 @@ describe('useSlashCompletion', () => {
           ),
         );
 
-        expect(result.current.suggestions).toHaveLength(0);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(200);
+        });
+
+        await act(async () => {
+          await vi.waitFor(() => {
+            expect(result.current.suggestions).toHaveLength(0);
+          });
+        });
+
+        await act(async () => {
+          unmount();
+        });
       },
     );
 
@@ -320,7 +412,7 @@ describe('useSlashCompletion', () => {
       const slashCommands = [
         createTestCommand({ name: 'clear', description: 'Clear the screen' }),
       ];
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/clear ',
@@ -329,14 +421,26 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toHaveLength(0);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions).toHaveLength(0);
+        });
+      });
+
+      await act(async () => {
+        unmount();
+      });
     });
 
     it('should not provide suggestions for an unknown command', async () => {
       const slashCommands = [
         createTestCommand({ name: 'help', description: 'Show help' }),
       ];
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/unknown-command',
@@ -345,7 +449,19 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toHaveLength(0);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions).toHaveLength(0);
+        });
+      });
+
+      await act(async () => {
+        unmount();
+      });
     });
 
     it('should not suggest hidden commands', async () => {
@@ -360,7 +476,7 @@ describe('useSlashCompletion', () => {
           hidden: true,
         }),
       ];
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/',
@@ -369,9 +485,19 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions.length).toBe(1);
-        expect(result.current.suggestions[0].label).toBe('visible');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions.length).toBe(1);
+          expect(result.current.suggestions[0].label).toBe('visible');
+        });
+      });
+
+      await act(async () => {
+        unmount();
       });
     });
   });
@@ -389,7 +515,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory ',
@@ -398,24 +524,34 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions).toHaveLength(2);
-        expect(result.current.suggestions).toEqual(
-          expect.arrayContaining([
-            {
-              label: 'show',
-              value: 'show',
-              description: 'Show memory',
-              commandKind: CommandKind.BUILT_IN,
-            },
-            {
-              label: 'add',
-              value: 'add',
-              description: 'Add to memory',
-              commandKind: CommandKind.BUILT_IN,
-            },
-          ]),
-        );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions).toHaveLength(2);
+          expect(result.current.suggestions).toEqual(
+            expect.arrayContaining([
+              {
+                label: 'show',
+                value: 'show',
+                description: 'Show memory',
+                commandKind: CommandKind.BUILT_IN,
+              },
+              {
+                label: 'add',
+                value: 'add',
+                description: 'Add to memory',
+                commandKind: CommandKind.BUILT_IN,
+              },
+            ]),
+          );
+        });
+      });
+
+      await act(async () => {
+        unmount();
       });
     });
 
@@ -430,7 +566,7 @@ describe('useSlashCompletion', () => {
           ],
         }),
       ];
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory ',
@@ -439,24 +575,34 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions).toHaveLength(2);
-        expect(result.current.suggestions).toEqual(
-          expect.arrayContaining([
-            {
-              label: 'show',
-              value: 'show',
-              description: 'Show memory',
-              commandKind: CommandKind.BUILT_IN,
-            },
-            {
-              label: 'add',
-              value: 'add',
-              description: 'Add to memory',
-              commandKind: CommandKind.BUILT_IN,
-            },
-          ]),
-        );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions).toHaveLength(2);
+          expect(result.current.suggestions).toEqual(
+            expect.arrayContaining([
+              {
+                label: 'show',
+                value: 'show',
+                description: 'Show memory',
+                commandKind: CommandKind.BUILT_IN,
+              },
+              {
+                label: 'add',
+                value: 'add',
+                description: 'Add to memory',
+                commandKind: CommandKind.BUILT_IN,
+              },
+            ]),
+          );
+        });
+      });
+
+      await act(async () => {
+        unmount();
       });
     });
 
@@ -471,7 +617,7 @@ describe('useSlashCompletion', () => {
           ],
         }),
       ];
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory a',
@@ -480,15 +626,25 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions).toEqual([
-          {
-            label: 'add',
-            value: 'add',
-            description: 'Add to memory',
-            commandKind: CommandKind.BUILT_IN,
-          },
-        ]);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions).toEqual([
+            {
+              label: 'add',
+              value: 'add',
+              description: 'Add to memory',
+              commandKind: CommandKind.BUILT_IN,
+            },
+          ]);
+        });
+      });
+
+      await act(async () => {
+        unmount();
       });
     });
 
@@ -503,7 +659,7 @@ describe('useSlashCompletion', () => {
           ],
         }),
       ];
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory dothisnow',
@@ -512,7 +668,19 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toHaveLength(0);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions).toHaveLength(0);
+        });
+      });
+
+      await act(async () => {
+        unmount();
+      });
     });
   });
 
@@ -544,7 +712,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/chat resume my-ch',
@@ -553,24 +721,36 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(mockCompletionFn).toHaveBeenCalledWith(
-          expect.objectContaining({
-            invocation: {
-              raw: '/chat resume my-ch',
-              name: 'resume',
-              args: 'my-ch',
-            },
-          }),
-          'my-ch',
-        );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
       });
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions).toEqual([
-          { label: 'my-chat-tag-1', value: 'my-chat-tag-1' },
-          { label: 'my-chat-tag-2', value: 'my-chat-tag-2' },
-        ]);
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(mockCompletionFn).toHaveBeenCalledWith(
+            expect.objectContaining({
+              invocation: {
+                raw: '/chat resume my-ch',
+                name: 'resume',
+                args: 'my-ch',
+              },
+            }),
+            'my-ch',
+          );
+        });
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions).toEqual([
+            { label: 'my-chat-tag-1', value: 'my-chat-tag-1' },
+            { label: 'my-chat-tag-2', value: 'my-chat-tag-2' },
+          ]);
+        });
+      });
+
+      await act(async () => {
+        unmount();
       });
     });
 
@@ -593,7 +773,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/chat resume ',
@@ -602,21 +782,33 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(mockCompletionFn).toHaveBeenCalledWith(
-          expect.objectContaining({
-            invocation: {
-              raw: '/chat resume',
-              name: 'resume',
-              args: '',
-            },
-          }),
-          '',
-        );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
       });
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions).toHaveLength(3);
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(mockCompletionFn).toHaveBeenCalledWith(
+            expect.objectContaining({
+              invocation: {
+                raw: '/chat resume',
+                name: 'resume',
+                args: '',
+              },
+            }),
+            '',
+          );
+        });
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions).toHaveLength(3);
+        });
+      });
+
+      await act(async () => {
+        unmount();
       });
     });
 
@@ -636,7 +828,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/chat resume ',
@@ -645,7 +837,19 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toHaveLength(0);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions).toHaveLength(0);
+        });
+      });
+
+      await act(async () => {
+        unmount();
+      });
     });
   });
 
@@ -666,7 +870,7 @@ describe('useSlashCompletion', () => {
         },
       ] as SlashCommand[];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/',
@@ -675,22 +879,34 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toEqual(
-        expect.arrayContaining([
-          {
-            label: 'summarize',
-            value: 'summarize',
-            description: 'Summarize content',
-            commandKind: CommandKind.MCP_PROMPT,
-          },
-          {
-            label: 'help',
-            value: 'help',
-            description: 'Show help',
-            commandKind: CommandKind.BUILT_IN,
-          },
-        ]),
-      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions).toEqual(
+            expect.arrayContaining([
+              {
+                label: 'summarize',
+                value: 'summarize',
+                description: 'Summarize content',
+                commandKind: CommandKind.MCP_PROMPT,
+              },
+              {
+                label: 'help',
+                value: 'help',
+                description: 'Show help',
+                commandKind: CommandKind.BUILT_IN,
+              },
+            ]),
+          );
+        });
+      });
+
+      await act(async () => {
+        unmount();
+      });
     });
 
     it('should include commandKind when filtering MCP commands by prefix', async () => {
@@ -709,7 +925,7 @@ describe('useSlashCompletion', () => {
         },
       ] as SlashCommand[];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/summ',
@@ -718,15 +934,25 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions).toEqual([
-          {
-            label: 'summarize',
-            value: 'summarize',
-            description: 'Summarize content',
-            commandKind: CommandKind.MCP_PROMPT,
-          },
-        ]);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions).toEqual([
+            {
+              label: 'summarize',
+              value: 'summarize',
+              description: 'Summarize content',
+              commandKind: CommandKind.MCP_PROMPT,
+            },
+          ]);
+        });
+      });
+
+      await act(async () => {
+        unmount();
       });
     });
 
@@ -753,7 +979,7 @@ describe('useSlashCompletion', () => {
         },
       ] as SlashCommand[];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory',
@@ -762,22 +988,34 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toEqual(
-        expect.arrayContaining([
-          {
-            label: 'show',
-            value: 'show',
-            description: 'Show memory',
-            commandKind: CommandKind.BUILT_IN,
-          },
-          {
-            label: 'add',
-            value: 'add',
-            description: 'Add to memory',
-            commandKind: CommandKind.MCP_PROMPT,
-          },
-        ]),
-      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions).toEqual(
+            expect.arrayContaining([
+              {
+                label: 'show',
+                value: 'show',
+                description: 'Show memory',
+                commandKind: CommandKind.BUILT_IN,
+              },
+              {
+                label: 'add',
+                value: 'add',
+                description: 'Add to memory',
+                commandKind: CommandKind.MCP_PROMPT,
+              },
+            ]),
+          );
+        });
+      });
+
+      await act(async () => {
+        unmount();
+      });
     });
 
     it('should include commandKind for file commands', async () => {
@@ -790,7 +1028,7 @@ describe('useSlashCompletion', () => {
         },
       ] as SlashCommand[];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/custom',
@@ -799,20 +1037,30 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions).toEqual([
-          {
-            label: 'custom-script',
-            value: 'custom-script',
-            description: 'Run custom script',
-            commandKind: CommandKind.FILE,
-          },
-        ]);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(result.current.suggestions).toEqual([
+            {
+              label: 'custom-script',
+              value: 'custom-script',
+              description: 'Run custom script',
+              commandKind: CommandKind.FILE,
+            },
+          ]);
+        });
+      });
+
+      await act(async () => {
+        unmount();
       });
     });
   });
 
-  it('should not call shared callbacks when disabled', () => {
+  it('should not call shared callbacks when disabled', async () => {
     const mockSetSuggestions = vi.fn();
     const mockSetIsLoadingSuggestions = vi.fn();
     const mockSetIsPerfectMatch = vi.fn();
@@ -824,7 +1072,7 @@ describe('useSlashCompletion', () => {
       }),
     ];
 
-    const { rerender } = renderHook(
+    const { rerender, unmount } = renderHook(
       ({ enabled, query }) =>
         useSlashCompletion({
           enabled,
@@ -846,12 +1094,24 @@ describe('useSlashCompletion', () => {
     mockSetIsPerfectMatch.mockClear();
 
     // Change query while disabled (simulating @ completion typing)
-    rerender({ enabled: false, query: '@src/file.ts' });
-    rerender({ enabled: false, query: '@src/file.tsx' });
+    await act(async () => {
+      rerender({ enabled: false, query: '@src/file.ts' });
+    });
+    await act(async () => {
+      rerender({ enabled: false, query: '@src/file.tsx' });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
 
     // Should not have called shared callbacks during @ completion typing
     expect(mockSetSuggestions).not.toHaveBeenCalled();
     expect(mockSetIsLoadingSuggestions).not.toHaveBeenCalled();
     expect(mockSetIsPerfectMatch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      unmount();
+    });
   });
 });

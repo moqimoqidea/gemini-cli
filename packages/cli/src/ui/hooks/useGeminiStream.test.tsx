@@ -1038,12 +1038,11 @@ describe('useGeminiStream', () => {
       simulateEscapeKeyPress();
 
       // Allow the stream to continue
-      act(() => {
+      await act(async () => {
         continueStream();
+        // Wait a bit to see if the second part is processed
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
-
-      // Wait a bit to see if the second part is processed
-      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // The text should not have been updated with " Canceled"
       const lastCall = mockAddItem.mock.calls.find(

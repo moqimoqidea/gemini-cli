@@ -15,7 +15,9 @@ describe('useConsoleMessages', () => {
   });
 
   afterEach(() => {
-    vi.runOnlyPendingTimers();
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
     vi.useRealTimers();
   });
 
@@ -44,14 +46,19 @@ describe('useConsoleMessages', () => {
       hookResult = useTestableConsoleMessages();
       return null;
     }
-    const { unmount } = render(<TestComponent />);
+    let unmount: () => void;
+    act(() => {
+      const renderResult = render(<TestComponent />);
+      unmount = renderResult.unmount;
+    });
+
     return {
       result: {
         get current() {
           return hookResult;
         },
       },
-      unmount,
+      unmount: unmount!,
     };
   };
 
@@ -156,7 +163,9 @@ describe('useConsoleMessages', () => {
       result.current.log('A message');
     });
 
-    unmount();
+    act(() => {
+      unmount();
+    });
 
     expect(clearTimeoutSpy).toHaveBeenCalled();
     clearTimeoutSpy.mockRestore();

@@ -6,7 +6,36 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { useState, useEffect } from 'react';
-import { renderHook } from './render.js';
+import { Text } from 'ink';
+import { renderHook, render } from './render.js';
+
+describe('render', () => {
+  it('should render a component', () => {
+    const { lastFrame } = render(<Text>Hello World</Text>);
+    expect(lastFrame()).toBe('Hello World');
+  });
+
+  it('should support rerender', () => {
+    const { lastFrame, rerender } = render(<Text>Hello</Text>);
+    expect(lastFrame()).toBe('Hello');
+
+    rerender(<Text>World</Text>);
+    expect(lastFrame()).toBe('World');
+  });
+
+  it('should support unmount', () => {
+    const cleanup = vi.fn();
+    function TestComponent() {
+      useEffect(() => cleanup, []);
+      return <Text>Hello</Text>;
+    }
+
+    const { unmount } = render(<TestComponent />);
+    unmount();
+
+    expect(cleanup).toHaveBeenCalled();
+  });
+});
 
 describe('renderHook', () => {
   it('should rerender with previous props when called without arguments', async () => {

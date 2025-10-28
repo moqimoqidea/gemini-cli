@@ -5,7 +5,7 @@
  */
 
 import { act } from 'react';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import {
   vi,
   describe,
@@ -18,13 +18,30 @@ import {
 
 const mockIsBinary = vi.hoisted(() => vi.fn());
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
-vi.mock('@google/gemini-cli-core', () => ({
-  ShellExecutionService: { execute: mockShellExecutionService },
-  isBinary: mockIsBinary,
-}));
-vi.mock('fs');
-vi.mock('os');
-vi.mock('crypto');
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    ShellExecutionService: { execute: mockShellExecutionService },
+    isBinary: mockIsBinary,
+  };
+});
+vi.mock('node:fs');
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  const mocked = {
+    ...actual,
+    homedir: vi.fn(() => '/home/user'),
+    platform: vi.fn(() => 'linux'),
+    tmpdir: vi.fn(() => '/tmp'),
+  };
+  return {
+    ...mocked,
+    default: mocked,
+  };
+});
+vi.mock('node:crypto');
 vi.mock('../utils/textUtils.js');
 
 import {
@@ -134,7 +151,7 @@ describe('useShellCommandProcessor', () => {
   it('should initiate command execution and set pending state', async () => {
     const { result } = renderProcessorHook();
 
-    act(() => {
+    await act(async () => {
       result.current.handleShellCommand('ls -l', new AbortController().signal);
     });
 
@@ -233,7 +250,7 @@ describe('useShellCommandProcessor', () => {
 
     it('should update UI for text streams (non-interactive)', async () => {
       const { result } = renderProcessorHook();
-      act(() => {
+      await act(async () => {
         result.current.handleShellCommand(
           'stream',
           new AbortController().signal,
@@ -365,7 +382,7 @@ describe('useShellCommandProcessor', () => {
     vi.mocked(os.platform).mockReturnValue('win32');
     const { result } = renderProcessorHook();
 
-    act(() => {
+    await act(async () => {
       result.current.handleShellCommand('dir', new AbortController().signal);
     });
 
@@ -377,6 +394,11 @@ describe('useShellCommandProcessor', () => {
       false,
       expect.any(Object),
     );
+
+    await act(async () => {
+      resolveExecutionPromise(createMockServiceResult());
+    });
+    await act(async () => await onExecMock.mock.calls[0][0]);
   });
 
   it('should handle command abort and display cancelled status', async () => {
@@ -559,19 +581,17 @@ describe('useShellCommandProcessor', () => {
     it('should set activeShellPtyId when a command with a PID starts', async () => {
       const { result } = renderProcessorHook();
 
-      act(() => {
+      await act(async () => {
         result.current.handleShellCommand('ls', new AbortController().signal);
       });
 
-      await vi.waitFor(() => {
-        expect(result.current.activeShellPtyId).toBe(12345);
-      });
+      expect(result.current.activeShellPtyId).toBe(12345);
     });
 
     it('should update the pending history item with the ptyId', async () => {
       const { result } = renderProcessorHook();
 
-      act(() => {
+      await act(async () => {
         result.current.handleShellCommand('ls', new AbortController().signal);
       });
 
@@ -594,16 +614,14 @@ describe('useShellCommandProcessor', () => {
     it('should reset activeShellPtyId to null after successful execution', async () => {
       const { result } = renderProcessorHook();
 
-      act(() => {
+      await act(async () => {
         result.current.handleShellCommand('ls', new AbortController().signal);
       });
       const execPromise = onExecMock.mock.calls[0][0];
 
-      await vi.waitFor(() => {
-        expect(result.current.activeShellPtyId).toBe(12345);
-      });
+      expect(result.current.activeShellPtyId).toBe(12345);
 
-      act(() => {
+      await act(async () => {
         resolveExecutionPromise(createMockServiceResult());
       });
       await act(async () => await execPromise);
@@ -614,7 +632,7 @@ describe('useShellCommandProcessor', () => {
     it('should reset activeShellPtyId to null after failed execution', async () => {
       const { result } = renderProcessorHook();
 
-      act(() => {
+      await act(async () => {
         result.current.handleShellCommand(
           'bad-cmd',
           new AbortController().signal,
@@ -622,11 +640,9 @@ describe('useShellCommandProcessor', () => {
       });
       const execPromise = onExecMock.mock.calls[0][0];
 
-      await vi.waitFor(() => {
-        expect(result.current.activeShellPtyId).toBe(12345);
-      });
+      expect(result.current.activeShellPtyId).toBe(12345);
 
-      act(() => {
+      await act(async () => {
         resolveExecutionPromise(createMockServiceResult({ exitCode: 1 }));
       });
       await act(async () => await execPromise);
@@ -638,7 +654,7 @@ describe('useShellCommandProcessor', () => {
       let rejectResultPromise: (reason?: unknown) => void;
       mockShellExecutionService.mockImplementation(() =>
         Promise.resolve({
-          pid: 1234_5,
+          pid: 12345,
           result: new Promise((_, reject) => {
             rejectResultPromise = reject;
           }),
@@ -646,16 +662,14 @@ describe('useShellCommandProcessor', () => {
       );
       const { result } = renderProcessorHook();
 
-      act(() => {
+      await act(async () => {
         result.current.handleShellCommand('cmd', new AbortController().signal);
       });
       const execPromise = onExecMock.mock.calls[0][0];
 
-      await vi.waitFor(() => {
-        expect(result.current.activeShellPtyId).toBe(12345);
-      });
+      expect(result.current.activeShellPtyId).toBe(12345);
 
-      act(() => {
+      await act(async () => {
         rejectResultPromise(new Error('Failure'));
       });
 

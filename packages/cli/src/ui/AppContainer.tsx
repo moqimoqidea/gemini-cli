@@ -34,6 +34,7 @@ import {
   type IdeInfo,
   type IdeContext,
   type UserTierId,
+  type UserFeedbackPayload,
   DEFAULT_GEMINI_FLASH_MODEL,
   IdeClient,
   ideContextStore,
@@ -41,11 +42,15 @@ import {
   getAllGeminiMdFilenames,
   AuthType,
   clearCachedCredentialFile,
+  recordExitFail,
   ShellExecutionService,
   debugLogger,
+  coreEvents,
+  CoreEvent,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
+import { getPolicyErrorsForUI } from '../config/policy.js';
 import process from 'node:process';
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useMemoryMonitor } from './hooks/useMemoryMonitor.js';
@@ -89,9 +94,13 @@ import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
-import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
+import {
+  useConfirmUpdateRequests,
+  useExtensionUpdates,
+} from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
-import { ExtensionEnablementManager } from '../config/extensions/extensionEnablement.js';
+import { type ExtensionManager } from '../config/extension-manager.js';
+import { requestConsentInteractive } from '../config/extensions/consent.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -160,22 +169,20 @@ export const AppContainer = (props: AppContainerProps) => {
     null,
   );
 
-  const extensions = config.getExtensions();
-  const [extensionEnablementManager] = useState<ExtensionEnablementManager>(
-    new ExtensionEnablementManager(config.getEnabledExtensions()),
+  const extensionManager = config.getExtensionLoader() as ExtensionManager;
+  // We are in the interactive CLI, update how we request consent and settings.
+  extensionManager.setRequestConsent((description) =>
+    requestConsentInteractive(description, addConfirmUpdateExtensionRequest),
   );
+  extensionManager.setRequestSetting();
+
+  const { addConfirmUpdateExtensionRequest, confirmUpdateExtensionRequests } =
+    useConfirmUpdateRequests();
   const {
     extensionsUpdateState,
     extensionsUpdateStateInternal,
     dispatchExtensionStateUpdate,
-    confirmUpdateExtensionRequests,
-    addConfirmUpdateExtensionRequest,
-  } = useExtensionUpdates(
-    extensions,
-    extensionEnablementManager,
-    historyManager.addItem,
-    config.getWorkingDir(),
-  );
+  } = useExtensionUpdates(extensionManager, historyManager.addItem);
 
   const [isPermissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const openPermissionsDialog = useCallback(
@@ -246,20 +253,18 @@ export const AppContainer = (props: AppContainerProps) => {
     [historyManager.addItem],
   );
 
-  // Watch for model changes (e.g., from Flash fallback)
+  // Subscribe to fallback mode changes from core
   useEffect(() => {
-    const checkModelChange = () => {
+    const handleFallbackModeChanged = () => {
       const effectiveModel = getEffectiveModel();
-      if (effectiveModel !== currentModel) {
-        setCurrentModel(effectiveModel);
-      }
+      setCurrentModel(effectiveModel);
     };
 
-    checkModelChange();
-    const interval = setInterval(checkModelChange, 1000); // Check every second
-
-    return () => clearInterval(interval);
-  }, [config, currentModel, getEffectiveModel]);
+    coreEvents.on(CoreEvent.FallbackModeChanged, handleFallbackModeChanged);
+    return () => {
+      coreEvents.off(CoreEvent.FallbackModeChanged, handleFallbackModeChanged);
+    };
+  }, [getEffectiveModel]);
 
   const {
     consoleMessages,
@@ -535,7 +540,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
           config.getDebugMode(),
           config.getFileService(),
           settings.merged,
-          config.getExtensions(),
+          config.getExtensionLoader(),
           config.isTrustedFolder(),
           settings.merged.context?.importFormat || 'tree', // Use setting or default to 'tree'
           config.getFileFilteringOptions(),
@@ -575,11 +580,20 @@ Logging in with Google... Please restart Gemini CLI to continue.
         },
         Date.now(),
       );
-      console.error('Error refreshing memory:', error);
+      debugLogger.warn('Error refreshing memory:', error);
     }
   }, [config, historyManager, settings.merged]);
 
   const cancelHandlerRef = useRef<() => void>(() => {});
+
+  const getPreferredEditor = useCallback(
+    () => settings.merged.general?.preferredEditor as EditorType,
+    [settings.merged.general?.preferredEditor],
+  );
+
+  const onCancelSubmit = useCallback(() => {
+    cancelHandlerRef.current();
+  }, []);
 
   const {
     streamingState,
@@ -600,13 +614,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
     setDebugMessage,
     handleSlashCommand,
     shellModeActive,
-    () => settings.merged.general?.preferredEditor as EditorType,
+    getPreferredEditor,
     onAuthError,
     performMemoryRefresh,
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
     refreshStatic,
-    () => cancelHandlerRef.current(),
+    onCancelSubmit,
     setEmbeddedShellFocused,
     terminalWidth,
     terminalHeight,
@@ -798,9 +812,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const [showFullTodos, setShowFullTodos] = useState<boolean>(false);
   const [renderMarkdown, setRenderMarkdown] = useState<boolean>(true);
 
-  const [ctrlCPressedOnce, setCtrlCPressedOnce] = useState(false);
+  const [ctrlCPressCount, setCtrlCPressCount] = useState(0);
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [ctrlDPressedOnce, setCtrlDPressedOnce] = useState(false);
+  const [ctrlDPressCount, setCtrlDPressCount] = useState(0);
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [ideContextState, setIdeContextState] = useState<
@@ -872,11 +886,59 @@ Logging in with Google... Please restart Gemini CLI to continue.
     };
     appEvents.on(AppEvent.LogError, logErrorHandler);
 
+    // Emit any policy errors that were stored during config loading
+    // Only show these when message bus integration is enabled, as policies
+    // are only active when the message bus is being used.
+    if (config.getEnableMessageBusIntegration()) {
+      const policyErrors = getPolicyErrorsForUI();
+      if (policyErrors.length > 0) {
+        for (const error of policyErrors) {
+          appEvents.emit(AppEvent.LogError, error);
+        }
+      }
+    }
+
     return () => {
       appEvents.off(AppEvent.OpenDebugConsole, openDebugConsole);
       appEvents.off(AppEvent.LogError, logErrorHandler);
     };
-  }, [handleNewMessage]);
+  }, [handleNewMessage, config]);
+
+  useEffect(() => {
+    if (ctrlCTimerRef.current) {
+      clearTimeout(ctrlCTimerRef.current);
+      ctrlCTimerRef.current = null;
+    }
+    if (ctrlCPressCount > 2) {
+      recordExitFail(config);
+    }
+    if (ctrlCPressCount > 1) {
+      handleSlashCommand('/quit');
+    } else {
+      ctrlCTimerRef.current = setTimeout(() => {
+        setCtrlCPressCount(0);
+        ctrlCTimerRef.current = null;
+      }, CTRL_EXIT_PROMPT_DURATION_MS);
+    }
+  }, [ctrlCPressCount, config, setCtrlCPressCount, handleSlashCommand]);
+
+  useEffect(() => {
+    if (ctrlDTimerRef.current) {
+      clearTimeout(ctrlDTimerRef.current);
+      ctrlCTimerRef.current = null;
+    }
+    if (ctrlDPressCount > 2) {
+      recordExitFail(config);
+    }
+    if (ctrlDPressCount > 1) {
+      handleSlashCommand('/quit');
+    } else {
+      ctrlDTimerRef.current = setTimeout(() => {
+        setCtrlDPressCount(0);
+        ctrlDTimerRef.current = null;
+      }, CTRL_EXIT_PROMPT_DURATION_MS);
+    }
+  }, [ctrlDPressCount, config, setCtrlDPressCount, handleSlashCommand]);
 
   const handleEscapePromptChange = useCallback((showPrompt: boolean) => {
     setShowEscapePrompt(showPrompt);
@@ -908,28 +970,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
     settings.merged.ui?.customWittyPhrases,
   );
 
-  const handleExit = useCallback(
-    (
-      pressedOnce: boolean,
-      setPressedOnce: (value: boolean) => void,
-      timerRef: React.MutableRefObject<NodeJS.Timeout | null>,
-    ) => {
-      if (pressedOnce) {
-        if (timerRef.current) {
-          clearTimeout(timerRef.current);
-        }
-        handleSlashCommand('/quit');
-      } else {
-        setPressedOnce(true);
-        timerRef.current = setTimeout(() => {
-          setPressedOnce(false);
-          timerRef.current = null;
-        }, CTRL_EXIT_PROMPT_DURATION_MS);
-      }
-    },
-    [handleSlashCommand],
-  );
-
   const handleGlobalKeypress = useCallback(
     (key: Key) => {
       // Debug log keystrokes if enabled
@@ -938,26 +978,17 @@ Logging in with Google... Please restart Gemini CLI to continue.
       }
 
       if (keyMatchers[Command.QUIT](key)) {
-        if (!ctrlCPressedOnce) {
-          cancelOngoingRequest?.();
-        }
+        // If the user presses Ctrl+C, we want to cancel any ongoing requests.
+        // This should happen regardless of the count.
+        cancelOngoingRequest?.();
 
-        if (!ctrlCPressedOnce) {
-          setCtrlCPressedOnce(true);
-          ctrlCTimerRef.current = setTimeout(() => {
-            setCtrlCPressedOnce(false);
-            ctrlCTimerRef.current = null;
-          }, CTRL_EXIT_PROMPT_DURATION_MS);
-          return;
-        }
-
-        handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
+        setCtrlCPressCount((prev) => prev + 1);
         return;
       } else if (keyMatchers[Command.EXIT](key)) {
         if (buffer.text.length > 0) {
           return;
         }
-        handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
+        setCtrlDPressCount((prev) => prev + 1);
         return;
       }
 
@@ -1001,14 +1032,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       setShowErrorDetails,
       config,
       ideContextState,
-      handleExit,
-      ctrlCPressedOnce,
-      setCtrlCPressedOnce,
-      ctrlCTimerRef,
+      setCtrlCPressCount,
       buffer.text.length,
-      ctrlDPressedOnce,
-      setCtrlDPressedOnce,
-      ctrlDTimerRef,
+      setCtrlDPressCount,
       handleSlashCommand,
       cancelOngoingRequest,
       activePtyId,
@@ -1055,6 +1081,53 @@ Logging in with Google... Please restart Gemini CLI to continue.
     settings.merged.ui?.hideWindowTitle,
     stdout,
   ]);
+
+  useEffect(() => {
+    const handleUserFeedback = (payload: UserFeedbackPayload) => {
+      let type: MessageType;
+      switch (payload.severity) {
+        case 'error':
+          type = MessageType.ERROR;
+          break;
+        case 'warning':
+          type = MessageType.WARNING;
+          break;
+        case 'info':
+          type = MessageType.INFO;
+          break;
+        default:
+          throw new Error(
+            `Unexpected severity for user feedback: ${payload.severity}`,
+          );
+      }
+
+      historyManager.addItem(
+        {
+          type,
+          text: payload.message,
+        },
+        Date.now(),
+      );
+
+      // If there is an attached error object, log it to the debug drawer.
+      if (payload.error) {
+        debugLogger.warn(
+          `[Feedback Details for "${payload.message}"]`,
+          payload.error,
+        );
+      }
+    };
+
+    coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
+
+    // Flush any messages that happened during startup before this component
+    // mounted.
+    coreEvents.drainFeedbackBacklog();
+
+    return () => {
+      coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
+    };
+  }, [historyManager]);
 
   const filteredConsoleMessages = useMemo(() => {
     if (config.getDebugMode()) {
@@ -1143,8 +1216,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
-      ctrlCPressedOnce,
-      ctrlDPressedOnce,
+      ctrlCPressedOnce: ctrlCPressCount >= 1,
+      ctrlDPressedOnce: ctrlDPressCount >= 1,
       showEscapePrompt,
       isFocused,
       elapsedTime,
@@ -1224,8 +1297,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
-      ctrlCPressedOnce,
-      ctrlDPressedOnce,
+      ctrlCPressCount,
+      ctrlDPressCount,
       showEscapePrompt,
       isFocused,
       elapsedTime,

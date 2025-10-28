@@ -6,7 +6,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import stripAnsi from 'strip-ansi';
-import { renderHook, act } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../../test-utils/render.js';
 import type {
   Viewport,
   TextBuffer,

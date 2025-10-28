@@ -1145,6 +1145,15 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      jitContext: {
+        type: 'boolean',
+        label: 'JIT Context Loading',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable Just-In-Time loading of context files.',
+        showInDialog: false,
+      },
     },
   },
 

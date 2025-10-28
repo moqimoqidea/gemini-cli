@@ -773,13 +773,6 @@ class EditToolInvocation
             : this.params.new_string,
         );
 
-        console.log(
-          `adib originallyProposedContent ${originallyProposedContent}`,
-        );
-        console.log(`editData.currentContent ${editData.currentContent}`);
-        console.log(`adib aipropsedstring ${this.params.ai_proposed_string}`);
-        console.log(`adib ${this.params.old_string}`);
-        console.log(`${this.params.new_string}`);
         const diffStat = getDiffStat(
           fileName,
           editData.currentContent ?? '',

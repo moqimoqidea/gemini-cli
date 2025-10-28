@@ -399,11 +399,12 @@ class EditToolInvocation
           this.params.old_string,
           this.params.ai_proposed_content,
         );
+
+        console.log(`ai proposed content, ${this.params.ai_proposed_content}`);
       } else {
+        console.log(`new content ${editData.newContent}`);
         originallyProposedContent = editData.newContent;
       }
-
-      console.log(`originallyProposedContent ${originallyProposedContent}`);
 
       const diffStat = getDiffStat(
         fileName,

@@ -108,7 +108,7 @@ jobs:
           package-scope: '${{ vars.NPM_REGISTRY_SCOPE }}'
 
       - name: '🔬 Verify Bundled NPM release by version'
-        if: "${{ github.event.inputs.dry_run == false && github.event.inputs.force_skip_tests == false }}"
+        if: '${{ github.event.inputs.dry_run == false && github.event.inputs.force_skip_tests == false }}'
         working-directory: './release'
         shell: 'bash'
         env:

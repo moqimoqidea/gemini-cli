@@ -422,6 +422,12 @@ describe('startInteractiveUI', () => {
   } as LoadedSettings;
   const mockStartupWarnings = ['warning1'];
   const mockWorkspaceRoot = '/root';
+  const mockInitializationResult = {
+    authError: null,
+    themeError: null,
+    shouldOpenAuthDialog: false,
+    geminiMdFileCount: 0,
+  };
 
   vi.mock('./utils/version.js', () => ({
     getCliVersion: vi.fn(() => Promise.resolve('1.0.0')),
@@ -452,13 +458,6 @@ describe('startInteractiveUI', () => {
     const { render } = await import('ink');
     const renderSpy = vi.mocked(render);
 
-    const mockInitializationResult = {
-      authError: null,
-      themeError: null,
-      shouldOpenAuthDialog: false,
-      geminiMdFileCount: 0,
-    };
-
     await startInteractiveUI(
       mockConfig,
       mockSettings,
@@ -475,23 +474,27 @@ describe('startInteractiveUI', () => {
     expect(options).toEqual({
       exitOnCtrlC: false,
       isScreenReaderEnabled: false,
+      onRender: expect.any(Function),
     });
 
     // Verify React element structure is valid (but don't deep dive into JSX internals)
     expect(reactElement).toBeDefined();
   });
 
+  it('should log slow renders', async () => {
+    await startInteractiveUI(
+      mockConfig,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      mockInitializationResult,
+    );
+  });
+
   it('should perform all startup tasks in correct order', async () => {
     const { getCliVersion } = await import('./utils/version.js');
     const { checkForUpdates } = await import('./ui/utils/updateCheck.js');
     const { registerCleanup } = await import('./utils/cleanup.js');
-
-    const mockInitializationResult = {
-      authError: null,
-      themeError: null,
-      shouldOpenAuthDialog: false,
-      geminiMdFileCount: 0,
-    };
 
     await startInteractiveUI(
       mockConfig,
@@ -534,13 +537,6 @@ describe('startInteractiveUI', () => {
       ...mockConfig,
       getScreenReader: () => screenReader,
     } as Config;
-
-    const mockInitializationResult = {
-      authError: null,
-      themeError: null,
-      shouldOpenAuthDialog: false,
-      geminiMdFileCount: 0,
-    };
 
     await startInteractiveUI(
       mockConfigWithScreenReader,

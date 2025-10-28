@@ -114,13 +114,24 @@ vi.mock('@google/gemini-cli-core', async () => {
   };
 });
 
+// Global setup to ensure clean environment for all tests in this file
+const originalArgv = process.argv;
+const originalGeminiModel = process.env['GEMINI_MODEL'];
+
+beforeEach(() => {
+  delete process.env['GEMINI_MODEL'];
+});
+
+afterEach(() => {
+  process.argv = originalArgv;
+  if (originalGeminiModel !== undefined) {
+    process.env['GEMINI_MODEL'] = originalGeminiModel;
+  } else {
+    delete process.env['GEMINI_MODEL'];
+  }
+});
+
 describe('parseArguments', () => {
-  const originalArgv = process.argv;
-
-  afterEach(() => {
-    process.argv = originalArgv;
-  });
-
   it('should throw an error when both --prompt and --prompt-interactive are used together', async () => {
     process.argv = [
       'node',
@@ -235,13 +246,13 @@ describe('parseArguments', () => {
       '@path',
       './file.md',
       '--model',
-      'gemini-1.5-pro',
+      'gemini-2.5-pro',
     ];
     const argv = await parseArguments({} as Settings);
     expect(argv.query).toBe('@path ./file.md');
     expect(argv.prompt).toBe('@path ./file.md'); // Should map to one-shot
     expect(argv.promptInteractive).toBeUndefined();
-    expect(argv.model).toBe('gemini-1.5-pro');
+    expect(argv.model).toBe('gemini-2.5-pro');
   });
 
   it('maps unquoted positional @path + arg to prompt (one-shot)', async () => {
@@ -494,8 +505,6 @@ describe('parseArguments', () => {
 });
 
 describe('loadCliConfig', () => {
-  const originalArgv = process.argv;
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
@@ -503,7 +512,6 @@ describe('loadCliConfig', () => {
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -1168,8 +1176,6 @@ describe('Approval mode tool exclusion logic', () => {
 });
 
 describe('loadCliConfig with allowed-mcp-server-names', () => {
-  const originalArgv = process.argv;
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
@@ -1177,7 +1183,6 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -1347,7 +1352,7 @@ describe('loadCliConfig model selection', () => {
     const config = await loadCliConfig(
       {
         model: {
-          name: 'gemini-9001-ultra',
+          name: 'gemini-2.5-pro',
         },
       },
       [],
@@ -1355,7 +1360,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-9001-ultra');
+    expect(config.getModel()).toBe('gemini-2.5-pro');
   });
 
   it('uses the default gemini model if nothing is set', async () => {
@@ -1374,12 +1379,12 @@ describe('loadCliConfig model selection', () => {
   });
 
   it('always prefers model from argv', async () => {
-    process.argv = ['node', 'script.js', '--model', 'gemini-8675309-ultra'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash-preview'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(
       {
         model: {
-          name: 'gemini-9001-ultra',
+          name: 'gemini-2.5-pro',
         },
       },
       [],
@@ -1387,11 +1392,11 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-8675309-ultra');
+    expect(config.getModel()).toBe('gemini-2.5-flash-preview');
   });
 
   it('selects the model from argv if provided', async () => {
-    process.argv = ['node', 'script.js', '--model', 'gemini-8675309-ultra'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash-preview'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(
       {
@@ -1402,7 +1407,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-8675309-ultra');
+    expect(config.getModel()).toBe('gemini-2.5-flash-preview');
   });
 });
 
@@ -1498,8 +1503,6 @@ describe('loadCliConfig model selection with model router', () => {
 });
 
 describe('loadCliConfig folderTrust', () => {
-  const originalArgv = process.argv;
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
@@ -1507,7 +1510,6 @@ describe('loadCliConfig folderTrust', () => {
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -1550,8 +1552,6 @@ describe('loadCliConfig folderTrust', () => {
 });
 
 describe('loadCliConfig with includeDirectories', () => {
-  const originalArgv = process.argv;
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
@@ -1562,8 +1562,6 @@ describe('loadCliConfig with includeDirectories', () => {
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
-    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -1604,8 +1602,6 @@ describe('loadCliConfig with includeDirectories', () => {
 });
 
 describe('loadCliConfig chatCompression', () => {
-  const originalArgv = process.argv;
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
@@ -1613,7 +1609,6 @@ describe('loadCliConfig chatCompression', () => {
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -1644,8 +1639,6 @@ describe('loadCliConfig chatCompression', () => {
 });
 
 describe('loadCliConfig useRipgrep', () => {
-  const originalArgv = process.argv;
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
@@ -1653,7 +1646,6 @@ describe('loadCliConfig useRipgrep', () => {
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -1710,8 +1702,6 @@ describe('loadCliConfig useRipgrep', () => {
 });
 
 describe('screenReader configuration', () => {
-  const originalArgv = process.argv;
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
@@ -1719,7 +1709,6 @@ describe('screenReader configuration', () => {
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -1764,7 +1753,6 @@ describe('screenReader configuration', () => {
 });
 
 describe('loadCliConfig tool exclusions', () => {
-  const originalArgv = process.argv;
   const originalIsTTY = process.stdin.isTTY;
 
   beforeEach(() => {
@@ -1779,7 +1767,6 @@ describe('loadCliConfig tool exclusions', () => {
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     process.stdin.isTTY = originalIsTTY;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
@@ -1872,7 +1859,6 @@ describe('loadCliConfig tool exclusions', () => {
 });
 
 describe('loadCliConfig interactive', () => {
-  const originalArgv = process.argv;
   const originalIsTTY = process.stdin.isTTY;
 
   beforeEach(() => {
@@ -1883,7 +1869,6 @@ describe('loadCliConfig interactive', () => {
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     process.stdin.isTTY = originalIsTTY;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
@@ -1923,7 +1908,7 @@ describe('loadCliConfig interactive', () => {
 
   it('should not be interactive if positional prompt words are provided with other flags', async () => {
     process.stdin.isTTY = true;
-    process.argv = ['node', 'script.js', '--model', 'gemini-1.5-pro', 'Hello'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-pro', 'Hello'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, [], 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
@@ -1935,7 +1920,7 @@ describe('loadCliConfig interactive', () => {
       'node',
       'script.js',
       '--model',
-      'gemini-1.5-pro',
+      'gemini-2.5-pro',
       '--yolo',
       'Hello world',
     ];
@@ -1973,7 +1958,7 @@ describe('loadCliConfig interactive', () => {
       'node',
       'script.js',
       '--model',
-      'gemini-1.5-pro',
+      'gemini-2.5-pro',
       'write',
       'a',
       'function',
@@ -1985,7 +1970,7 @@ describe('loadCliConfig interactive', () => {
     const config = await loadCliConfig({}, [], 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
     expect(argv.query).toBe('write a function to sort array');
-    expect(argv.model).toBe('gemini-1.5-pro');
+    expect(argv.model).toBe('gemini-2.5-pro');
   });
 
   it('should handle empty positional arguments', async () => {
@@ -2019,7 +2004,7 @@ describe('loadCliConfig interactive', () => {
 
   it('should be interactive if no positional prompt words are provided with flags', async () => {
     process.stdin.isTTY = true;
-    process.argv = ['node', 'script.js', '--model', 'gemini-1.5-pro'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-pro'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, [], 'test-session', argv);
     expect(config.isInteractive()).toBe(true);

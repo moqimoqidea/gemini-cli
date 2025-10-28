@@ -44,7 +44,10 @@ import {
 import { doesToolInvocationMatch } from '../utils/tool-utils.js';
 import levenshtein from 'fast-levenshtein';
 import { ShellToolInvocation } from '../tools/shell.js';
-import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
+import type {
+  ToolConfirmationRequest,
+  ToolConfirmationDisplayRequest,
+} from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
@@ -387,6 +390,33 @@ export class CoreToolScheduler {
         messageBus.subscribe(
           MessageBusType.TOOL_CONFIRMATION_REQUEST,
           sharedHandler,
+        );
+
+        const displayRequestHandler = (
+          request: ToolConfirmationDisplayRequest,
+        ) => {
+          const waitingToolCall: WaitingToolCall = {
+            status: 'awaiting_approval',
+            request: {
+              callId: request.correlationId,
+              name: request.tool.name,
+              args: request.requestArgs,
+              isClientInitiated: true,
+              prompt_id: '',
+            },
+            tool: request.tool,
+            invocation: request.invocation,
+            confirmationDetails: request.confirmationDetails,
+          };
+
+          if (this.onToolCallsUpdate) {
+            this.onToolCallsUpdate([waitingToolCall]);
+          }
+        };
+
+        messageBus.subscribe(
+          MessageBusType.TOOL_CONFIRMATION_DISPLAY_REQUEST,
+          displayRequestHandler,
         );
 
         // Store the handler in the WeakMap so we don't subscribe again

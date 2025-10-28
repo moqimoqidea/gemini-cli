@@ -5,9 +5,15 @@
  */
 
 import { type FunctionCall } from '@google/genai';
+import {
+  type AnyDeclarativeTool,
+  type AnyToolInvocation,
+  type ToolCallConfirmationDetails,
+} from '../tools/tools.js';
 
 export enum MessageBusType {
   TOOL_CONFIRMATION_REQUEST = 'tool-confirmation-request',
+  TOOL_CONFIRMATION_DISPLAY_REQUEST = 'tool-confirmation-display-request',
   TOOL_CONFIRMATION_RESPONSE = 'tool-confirmation-response',
   TOOL_POLICY_REJECTION = 'tool-policy-rejection',
   TOOL_EXECUTION_SUCCESS = 'tool-execution-success',
@@ -19,6 +25,15 @@ export interface ToolConfirmationRequest {
   type: MessageBusType.TOOL_CONFIRMATION_REQUEST;
   toolCall: FunctionCall;
   correlationId: string;
+}
+
+export interface ToolConfirmationDisplayRequest {
+  type: MessageBusType.TOOL_CONFIRMATION_DISPLAY_REQUEST;
+  correlationId: string;
+  tool: AnyDeclarativeTool;
+  invocation: AnyToolInvocation;
+  requestArgs: Record<string, unknown>;
+  confirmationDetails: ToolCallConfirmationDetails;
 }
 
 export interface ToolConfirmationResponse {
@@ -56,6 +71,7 @@ export interface ToolExecutionFailure<E = Error> {
 
 export type Message =
   | ToolConfirmationRequest
+  | ToolConfirmationDisplayRequest
   | ToolConfirmationResponse
   | ToolPolicyRejection
   | ToolExecutionSuccess

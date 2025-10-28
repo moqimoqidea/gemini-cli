@@ -42,13 +42,18 @@ import { parseThought } from '../utils/thoughtUtils.js';
 import { templateString } from './utils.js';
 import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
 import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
+import { MessageBusType } from '../confirmation-bus/types.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 /**
  * An adapter that wraps a gemini-cli DeclarativeTool to make it compatible
  * with the adk LlmAgent.
  */
 export class AdkToolAdapter extends AdkBaseTool {
-  constructor(readonly tool: AnyDeclarativeTool) {
+  constructor(
+    readonly tool: AnyDeclarativeTool,
+    readonly messageBus: MessageBus,
+  ) {
     super(tool);
   }
 
@@ -59,6 +64,22 @@ export class AdkToolAdapter extends AdkBaseTool {
   async runAsync(request: RunAsyncToolRequest): Promise<unknown> {
     const invocation = this.tool.build(request.args);
     const abortController = new AbortController();
+
+    const confirmationDetails = await invocation.shouldConfirmExecute(
+      abortController.signal,
+    );
+
+    if (confirmationDetails) {
+      this.messageBus.publish({
+        type: MessageBusType.TOOL_CONFIRMATION_DISPLAY_REQUEST,
+        correlationId: randomUUID(),
+        tool: this.tool,
+        invocation,
+        requestArgs: request.args,
+        confirmationDetails,
+      });
+    }
+
     const result = await invocation.execute(abortController.signal);
     return result;
   }
@@ -108,6 +129,7 @@ async function prepareTools<TOutput extends z.ZodTypeAny>(
   definition: AgentDefinition<TOutput>,
 ): Promise<AdkToolAdapter[]> {
   const toolRegistry = await config.getToolRegistry();
+  const messageBus = config.getMessageBus();
   const { toolConfig, outputConfig } = definition;
   const toolsList: AdkToolAdapter[] = [];
 
@@ -117,14 +139,16 @@ async function prepareTools<TOutput extends z.ZodTypeAny>(
       if (typeof toolRef === 'string') {
         toolNamesToLoad.push(toolRef);
       } else {
-        toolsList.push(new AdkToolAdapter(toolRef as AnyDeclarativeTool));
+        toolsList.push(
+          new AdkToolAdapter(toolRef as AnyDeclarativeTool, messageBus),
+        );
       }
     }
     toolsList.push(
       ...toolRegistry
         .getAllTools()
         .filter((tool) => toolNamesToLoad.includes(tool.name))
-        .map((tool) => new AdkToolAdapter(tool)),
+        .map((tool) => new AdkToolAdapter(tool, messageBus)),
     );
   }
 
@@ -156,16 +180,19 @@ async function prepareTools<TOutput extends z.ZodTypeAny>(
   }
 
   toolsList.push(
-    new AdkToolAdapter({
-      name: TASK_COMPLETE_TOOL_NAME,
-      description: completeTool.description,
-      schema: completeTool as FunctionDeclaration,
-      build: (args: Record<string, unknown>) => ({
-        async execute() {
-          return JSON.stringify(args);
-        },
-      }),
-    } as unknown as AnyDeclarativeTool),
+    new AdkToolAdapter(
+      {
+        name: TASK_COMPLETE_TOOL_NAME,
+        description: completeTool.description,
+        schema: completeTool as FunctionDeclaration,
+        build: (args: Record<string, unknown>) => ({
+          async execute() {
+            return JSON.stringify(args);
+          },
+        }),
+      } as unknown as AnyDeclarativeTool,
+      messageBus,
+    ),
   );
 
   return toolsList;

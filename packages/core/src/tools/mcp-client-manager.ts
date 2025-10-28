@@ -29,6 +29,8 @@ export class McpClientManager {
   private clients: Map<string, McpClient> = new Map();
   private readonly toolRegistry: ToolRegistry;
   private readonly cliConfig: Config;
+  // If we have ongoing MCP client discovery, this completes once that is done.
+  private discoveryPromise: Promise<unknown> | undefined;
   private discoveryState: MCPDiscoveryState = MCPDiscoveryState.NOT_STARTED;
   private readonly eventEmitter?: EventEmitter;
 
@@ -39,7 +41,6 @@ export class McpClientManager {
   ) {
     this.toolRegistry = toolRegistry;
     this.cliConfig = cliConfig;
-    this.eventEmitter = eventEmitter;
     this.eventEmitter = eventEmitter;
     this.cliConfig
       .getExtensionLoader()
@@ -53,24 +54,23 @@ export class McpClientManager {
   }
 
   private async unloadExtension(extension: GeminiCLIExtension) {
-    debugLogger.warn(`Unloading extension: ${extension.name}`);
+    debugLogger.log(`Unloading extension: ${extension.name}`);
     await Promise.all(
       Object.keys(extension.mcpServers ?? {}).map((name) =>
         this.disconnectClient(name),
       ),
     );
+    this.cliConfig.getGeminiClient().setTools();
   }
 
   private async loadExtension(extension: GeminiCLIExtension) {
-    debugLogger.warn(`Loading extension: ${extension.name}`);
-    this.discoveryState = MCPDiscoveryState.IN_PROGRESS;
+    debugLogger.log(`Loading extension: ${extension.name}`);
     await Promise.all(
       Object.entries(extension.mcpServers ?? {}).map(([name, config]) =>
-        this.
-      (name, config),
+        this.discoverMcpTools(name, config),
       ),
     );
-    this.discoveryState = MCPDiscoveryState.COMPLETED;
+    this.cliConfig.getGeminiClient().setTools();
   }
 
   private async disconnectClient(name: string) {
@@ -95,33 +95,60 @@ export class McpClientManager {
     if (config.extension && !config.extension.isActive) {
       return;
     }
-    await this.disconnectClient(name);
 
-    const client = new McpClient(
-      name,
-      config,
-      this.toolRegistry,
-      this.cliConfig.getPromptRegistry(),
-      this.cliConfig.getWorkspaceContext(),
-      this.cliConfig.getDebugMode(),
-    );
-    this.clients.set(name, client);
-    this.eventEmitter?.emit('mcp-client-update', this.clients);
-    try {
-      await client.connect();
-      await client.discover(this.cliConfig);
-      this.eventEmitter?.emit('mcp-client-update', this.clients);
-    } catch (error) {
-      this.eventEmitter?.emit('mcp-client-update', this.clients);
-      // Log the error but don't let a single failed server stop the others
-      coreEvents.emitFeedback(
-        'error',
-        `Error during discovery for server '${name}': ${getErrorMessage(
-          error,
-        )}`,
-        error,
-      );
+    const currentDiscoveryPromise = new Promise<void>((resolve, _reject) => {
+      (async () => {
+        try {
+          await this.disconnectClient(name);
+
+          const client = new McpClient(
+            name,
+            config,
+            this.toolRegistry,
+            this.cliConfig.getPromptRegistry(),
+            this.cliConfig.getWorkspaceContext(),
+            this.cliConfig.getDebugMode(),
+          );
+          this.clients.set(name, client);
+          this.eventEmitter?.emit('mcp-client-update', this.clients);
+          try {
+            await client.connect();
+            await client.discover(this.cliConfig);
+            this.eventEmitter?.emit('mcp-client-update', this.clients);
+          } catch (error) {
+            this.eventEmitter?.emit('mcp-client-update', this.clients);
+            // Log the error but don't let a single failed server stop the others
+            coreEvents.emitFeedback(
+              'error',
+              `Error during discovery for server '${name}': ${getErrorMessage(
+                error,
+              )}`,
+              error,
+            );
+          }
+        } finally {
+          resolve();
+        }
+      })();
+    });
+
+    if (this.discoveryPromise) {
+      this.discoveryPromise = Promise.all([
+        this.discoveryPromise,
+        currentDiscoveryPromise,
+      ]);
+    } else {
+      this.discoveryState = MCPDiscoveryState.IN_PROGRESS;
+      this.discoveryPromise = currentDiscoveryPromise;
     }
+    const currentPromise = this.discoveryPromise;
+    currentPromise.then((_) => {
+      if (currentPromise === this.discoveryPromise) {
+        this.discoveryPromise = undefined;
+        this.discoveryState = MCPDiscoveryState.COMPLETED;
+      }
+    });
+    return currentPromise;
   }
 
   /**
@@ -140,15 +167,12 @@ export class McpClientManager {
       this.cliConfig.getMcpServerCommand(),
     );
 
-    this.discoveryState = MCPDiscoveryState.IN_PROGRESS;
-
     this.eventEmitter?.emit('mcp-client-update', this.clients);
-    const discoveryPromises = Object.entries(servers).map(
-      async ([name, config]) => this.discoverMcpTools(name, config),
+    await Promise.all(
+      Object.entries(servers).map(async ([name, config]) =>
+        this.discoverMcpTools(name, config),
+      ),
     );
-
-    await Promise.all(discoveryPromises);
-    this.discoveryState = MCPDiscoveryState.COMPLETED;
   }
 
   /**

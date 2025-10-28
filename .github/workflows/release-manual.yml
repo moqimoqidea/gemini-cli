@@ -100,7 +100,7 @@ jobs:
           working-directory: './release'
 
       - name: 'Publish Release'
-        uses: './.github/actions/publish-release'
+        uses: './.github/actions/publish-release-deprecated'
         with:
           force-skip-tests: '${{ github.event.inputs.force_skip_tests }}'
           release-version: '${{ steps.release_info.outputs.RELEASE_VERSION }}'

@@ -84,7 +84,7 @@ describe('Trusted Folders Loading', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p) => p === getTrustedFoldersPath(),
       );
-      (fs.readFileSync as Mock).mockImplementation((p) => {
+      vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
         if (p === getTrustedFoldersPath()) return JSON.stringify(config);
         return '{}';
       });
@@ -422,5 +422,55 @@ describe('Trusted Folders Caching', () => {
     // Third call should read the file again
     loadTrustedFolders();
     expect(readSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('invalid trust levels', () => {
+  const mockCwd = '/home/user/projectA';
+  const mockSettings: Settings = {
+    security: {
+      folderTrust: {
+        enabled: true,
+      },
+    },
+  };
+
+  beforeEach(() => {
+    resetTrustedFoldersForTesting();
+    vi.spyOn(process, 'cwd').mockImplementation(() => mockCwd);
+    vi.spyOn(fs, 'existsSync').mockImplementation(
+      (p) => p === getTrustedFoldersPath(),
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should create a comprehensive error message for invalid trust level', () => {
+    vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+      if (p === getTrustedFoldersPath()) {
+        return JSON.stringify({ mockCwd: 'INVALID_TRUST_LEVEL' });
+      }
+      return '{}';
+    });
+
+    const { errors } = loadTrustedFolders();
+    const possibleValues = Object.values(TrustLevel).join(', ');
+    expect(errors.length).toBe(1);
+    expect(errors[0].message).toBe(
+      `Invalid trust level "INVALID_TRUST_LEVEL" for path "/user/folder". Possible values are: ${possibleValues}.`,
+    );
+  });
+
+  it('should throw a fatal error for invalid trust level', () => {
+    vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+      if (p === getTrustedFoldersPath()) {
+        return JSON.stringify({ '/user/folder': 'INVALID_TRUST_LEVEL' });
+      }
+      return '{}';
+    });
+
+    expect(() => isWorkspaceTrusted(mockSettings)).toThrow(FatalConfigError);
   });
 });

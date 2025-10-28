@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render } from 'ink';
+import { render, type RenderOptions } from 'ink';
 import { AppContainer } from './ui/AppContainer.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
@@ -207,12 +207,12 @@ export async function startInteractiveUI(
     {
       exitOnCtrlC: false,
       isScreenReaderEnabled: config.getScreenReader(),
-      onRender: ({ renderTime }) => {
+      onRender: ({ renderTime }: { renderTime: number }) => {
         if (renderTime > SLOW_RENDER_MS) {
           recordSlowRender(config);
         }
       },
-    },
+    } as RenderOptions,
   );
 
   checkForUpdates(settings)

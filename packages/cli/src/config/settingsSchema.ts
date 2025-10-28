@@ -567,17 +567,6 @@ const SETTINGS_SCHEMA = {
           'Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.',
         showInDialog: true,
       },
-      summarizeToolOutput: {
-        type: 'object',
-        label: 'Summarize Tool Output',
-        category: 'Model',
-        requiresRestart: false,
-        default: undefined as
-          | Record<string, { tokenBudget?: number }>
-          | undefined,
-        description: 'Settings for summarizing tool output.',
-        showInDialog: false,
-      },
       chatCompression: {
         type: 'object',
         label: 'Chat Compression',
@@ -595,6 +584,143 @@ const SETTINGS_SCHEMA = {
         default: true,
         description: 'Skip the next speaker check.',
         showInDialog: true,
+      },
+    },
+  },
+
+  generation: {
+    type: 'object',
+    label: 'Generation',
+    category: 'Model',
+    requiresRestart: false,
+    default: {
+      aliases: {
+        base: {
+          settings: {
+            model: 'models/gemini-1.5-pro-latest',
+            config: {
+              temperature: 0.7,
+              topP: 0.95,
+            },
+          },
+        },
+        'gemini-1.5-pro': {
+          extends: 'base',
+          settings: {
+            model: 'models/gemini-1.5-pro-latest',
+          },
+        },
+        'gemini-1.5-flash': {
+          extends: 'base',
+          settings: {
+            model: 'models/gemini-1.5-flash-latest',
+          },
+        },
+        'gemini-1.5-flash-lite': {
+          extends: 'base',
+          settings: {
+            model: 'models/gemini-1.5-flash-lite-latest',
+          },
+        },
+        'classifier-v1': {
+          extends: 'base',
+          settings: {
+            model: 'models/gemini-1.5-flash-latest',
+            config: {
+              temperature: 0,
+              topP: 1,
+              maxOutputTokens: 1024,
+              thinkingConfig: {
+                thinkingBudget: 512,
+              },
+            },
+          },
+        },
+        'prompt-completion-v1': {
+          extends: 'base',
+          settings: {
+            model: 'models/gemini-1.5-flash-latest',
+            config: {
+              temperature: 0.3,
+              maxOutputTokens: 16000,
+              thinkingConfig: {
+                thinkingBudget: 0,
+              },
+            },
+          },
+        },
+        'edit-corrector-v1': {
+          extends: 'base',
+          settings: {
+            model: 'models/gemini-1.5-flash-lite-latest',
+            config: {
+              thinkingConfig: {
+                thinkingBudget: 0,
+              },
+            },
+          },
+        },
+        'summarizer-v1': {
+          extends: 'base',
+          settings: {
+            model: 'models/gemini-1.5-flash-latest',
+            config: {
+              temperature: 0.2,
+            },
+          },
+        },
+        'summarizer-shell-v1': {
+          extends: 'base',
+          settings: {
+            model: 'models/gemini-1.5-flash-latest',
+            config: {
+              temperature: 0.2,
+              maxOutputTokens: 2000,
+            },
+          },
+        },
+        'web-search-tool': {
+          extends: 'base',
+          settings: {
+            model: 'models/gemini-1.5-pro-latest',
+            config: {
+              tools: [{ googleSearch: {} }],
+            },
+          },
+        },
+        'web-fetch-tool': {
+          extends: 'base',
+          settings: {
+            model: 'models/gemini-1.5-pro-latest',
+            config: {
+              tools: [{ urlContext: {} }],
+            },
+          },
+        },
+      },
+    },
+    description: 'Settings that control model generation.',
+    showInDialog: false,
+    properties: {
+      aliases: {
+        type: 'object',
+        label: 'Generation Aliases',
+        category: 'Model',
+        requiresRestart: false,
+        default: {},
+        description:
+          'Named presets for generation settings. Can be used in place of a model name and can inherit from other aliases using an `extends` property.',
+        showInDialog: false,
+      },
+      overrides: {
+        type: 'array',
+        label: 'Generation Settings Overrides',
+        category: 'Model',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Apply specific generation settings based on the agent or model being used. The most specific match will be used.',
+        showInDialog: false,
       },
     },
   },

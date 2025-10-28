@@ -682,7 +682,6 @@ export async function loadCliConfig(
     extensionLoader: extensionManager,
     blockedMcpServers,
     noBrowser: !!process.env['NO_BROWSER'],
-    summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
     chatCompression: settings.model?.chatCompression,
     folderTrust,

@@ -174,7 +174,8 @@ class GeminiAgent {
     }
 
     const geminiClient = config.getGeminiClient();
-    const chat = await geminiClient.startChat();
+    const resolvedConfig = config.getModelResolvedConfig();
+    const chat = await geminiClient.startChat(resolvedConfig);
     const session = new Session(sessionId, chat, config, this.client);
     this.sessions.set(sessionId, session);
 

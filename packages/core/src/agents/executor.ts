@@ -270,8 +270,14 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       },
     };
 
+    const { model: resolvedModel } =
+      this.runtimeContext.generationConfigService.getResolvedConfig({
+        agent: this.definition.name,
+        model: this.definition.modelConfig.model,
+      });
+
     const responseStream = await chat.sendMessageStream(
-      this.definition.modelConfig.model,
+      resolvedModel,
       messageParams,
       promptId,
     );
@@ -336,24 +342,31 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       : undefined;
 
     try {
-      const generationConfig: GenerateContentConfig = {
-        temperature: modelConfig.temp,
-        topP: modelConfig.top_p,
+      const { sdkConfig: resolvedSettings } =
+        this.runtimeContext.generationConfigService.getResolvedConfig({
+          agent: this.definition.name,
+          model: modelConfig.model,
+        });
+
+      // The resolved config is the base. Agent-specific settings override it.
+      const finalConfig: GenerateContentConfig = {
+        ...resolvedSettings,
         thinkingConfig: {
+          ...(resolvedSettings.thinkingConfig ?? {}),
           includeThoughts: true,
           thinkingBudget: modelConfig.thinkingBudget ?? -1,
         },
       };
 
       if (systemInstruction) {
-        generationConfig.systemInstruction = systemInstruction;
+        finalConfig.systemInstruction = systemInstruction;
       }
 
-      return new GeminiChat(
-        this.runtimeContext,
-        generationConfig,
-        startHistory,
-      );
+      // IMPORTANT: We pass the *unresolved* model name/alias to the chat object.
+      // The model will be resolved again inside `callModel` for each API call.
+      // This ensures that any dynamic overrides based on runtime changes are
+      // applied correctly.
+      return new GeminiChat(this.runtimeContext, finalConfig, startHistory);
     } catch (error) {
       await reportError(
         error,

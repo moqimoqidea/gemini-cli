@@ -764,19 +764,10 @@ class EditToolInvocation
           DEFAULT_DIFF_OPTIONS,
         );
 
-        const originallyProposedContent = safeLiteralReplace(
-          editData.currentContent as string,
-          this.params.old_string,
-          this.params.ai_proposed_string !== null &&
-            this.params.ai_proposed_string !== undefined
-            ? this.params.ai_proposed_string
-            : this.params.new_string,
-        );
-
         const diffStat = getDiffStat(
           fileName,
           editData.currentContent ?? '',
-          originallyProposedContent,
+          editData.newContent,
           this.params.new_string,
         );
         displayResult = {

@@ -46,6 +46,9 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
+      - name: 'Install Dependencies'
+        run: 'npm ci'
+
       - name: 'Calculate Version and Tag'
         id: 'vars'
         run: |

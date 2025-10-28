@@ -17,10 +17,6 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: 'Install dependencies'
-      shell: 'bash'
-      run: 'npm ci'
-
     - name: 'Setup NPMRC'
       uses: './.github/actions/setup-npmrc'
       with:

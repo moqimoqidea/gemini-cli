@@ -4,16 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { requestConsentInteractive } from '../../config/extension.js';
-import {
-  updateAllUpdatableExtensions,
-  type ExtensionUpdateInfo,
-  updateExtension,
-  checkForAllExtensionUpdates,
-} from '../../config/extensions/update.js';
+import { listExtensions } from '@google/gemini-cli-core';
+import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
-import { ExtensionUpdateState } from '../state/extensions.js';
-import { MessageType } from '../types.js';
+import { MessageType, type HistoryItemExtensionsList } from '../types.js';
 import {
   type CommandContext,
   type SlashCommand,
@@ -21,19 +15,20 @@ import {
 } from './types.js';
 
 async function listAction(context: CommandContext) {
-  context.ui.addItem(
-    {
-      type: MessageType.EXTENSIONS_LIST,
-    },
-    Date.now(),
-  );
+  const historyItem: HistoryItemExtensionsList = {
+    type: MessageType.EXTENSIONS_LIST,
+    extensions: context.services.config
+      ? listExtensions(context.services.config)
+      : [],
+  };
+
+  context.ui.addItem(historyItem, Date.now());
 }
 
-async function updateAction(context: CommandContext, args: string) {
+function updateAction(context: CommandContext, args: string): Promise<void> {
   const updateArgs = args.split(' ').filter((value) => value.length > 0);
   const all = updateArgs.length === 1 && updateArgs[0] === '--all';
-  const names = all ? undefined : updateArgs;
-  let updateInfos: ExtensionUpdateInfo[] = [];
+  const names = all ? null : updateArgs;
 
   if (!all && names?.length === 0) {
     context.ui.addItem(
@@ -43,33 +38,51 @@ async function updateAction(context: CommandContext, args: string) {
       },
       Date.now(),
     );
-    return;
+    return Promise.resolve();
   }
 
-  try {
-    await checkForAllExtensionUpdates(
-      context.services.config!.getExtensions(),
-      context.ui.dispatchExtensionStateUpdate,
-    );
-    context.ui.setPendingItem({
-      type: MessageType.EXTENSIONS_LIST,
-    });
-    if (all) {
-      updateInfos = await updateAllUpdatableExtensions(
-        context.services.config!.getWorkingDir(),
-        // We don't have the ability to prompt for consent yet in this flow.
-        (description) =>
-          requestConsentInteractive(
-            description,
-            context.ui.addConfirmUpdateExtensionRequest,
-          ),
-        context.services.config!.getExtensions(),
-        context.ui.extensionsUpdateState,
-        context.ui.dispatchExtensionStateUpdate,
+  let resolveUpdateComplete: (updateInfo: ExtensionUpdateInfo[]) => void;
+  const updateComplete = new Promise<ExtensionUpdateInfo[]>(
+    (resolve) => (resolveUpdateComplete = resolve),
+  );
+
+  const historyItem: HistoryItemExtensionsList = {
+    type: MessageType.EXTENSIONS_LIST,
+    extensions: context.services.config
+      ? listExtensions(context.services.config)
+      : [],
+  };
+
+  updateComplete.then((updateInfos) => {
+    if (updateInfos.length === 0) {
+      context.ui.addItem(
+        {
+          type: MessageType.INFO,
+          text: 'No extensions to update.',
+        },
+        Date.now(),
       );
-    } else if (names?.length) {
-      const workingDir = context.services.config!.getWorkingDir();
-      const extensions = context.services.config!.getExtensions();
+    }
+
+    context.ui.addItem(historyItem, Date.now());
+    context.ui.setPendingItem(null);
+  });
+
+  try {
+    context.ui.setPendingItem(historyItem);
+
+    context.ui.dispatchExtensionStateUpdate({
+      type: 'SCHEDULE_UPDATE',
+      payload: {
+        all,
+        names,
+        onComplete: (updateInfos) => {
+          resolveUpdateComplete(updateInfos);
+        },
+      },
+    });
+    if (names?.length) {
+      const extensions = listExtensions(context.services.config!);
       for (const name of names) {
         const extension = extensions.find(
           (extension) => extension.name === name,
@@ -84,33 +97,10 @@ async function updateAction(context: CommandContext, args: string) {
           );
           continue;
         }
-        const updateInfo = await updateExtension(
-          extension,
-          workingDir,
-          (description) =>
-            requestConsentInteractive(
-              description,
-              context.ui.addConfirmUpdateExtensionRequest,
-            ),
-          context.ui.extensionsUpdateState.get(extension.name)?.status ??
-            ExtensionUpdateState.UNKNOWN,
-          context.ui.dispatchExtensionStateUpdate,
-        );
-        if (updateInfo) updateInfos.push(updateInfo);
       }
     }
-
-    if (updateInfos.length === 0) {
-      context.ui.addItem(
-        {
-          type: MessageType.INFO,
-          text: 'No extensions to update.',
-        },
-        Date.now(),
-      );
-      return;
-    }
   } catch (error) {
+    resolveUpdateComplete!([]);
     context.ui.addItem(
       {
         type: MessageType.ERROR,
@@ -118,15 +108,8 @@ async function updateAction(context: CommandContext, args: string) {
       },
       Date.now(),
     );
-  } finally {
-    context.ui.addItem(
-      {
-        type: MessageType.EXTENSIONS_LIST,
-      },
-      Date.now(),
-    );
-    context.ui.setPendingItem(null);
   }
+  return updateComplete.then((_) => {});
 }
 
 const listExtensionsCommand: SlashCommand = {
@@ -142,7 +125,9 @@ const updateExtensionsCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   action: updateAction,
   completion: async (context, partialArg) => {
-    const extensions = context.services.config?.getExtensions() ?? [];
+    const extensions = context.services.config
+      ? listExtensions(context.services.config)
+      : [];
     const extensionNames = extensions.map((ext) => ext.name);
     const suggestions = extensionNames.filter((name) =>
       name.startsWith(partialArg),

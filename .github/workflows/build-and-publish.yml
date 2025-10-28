@@ -29,7 +29,7 @@ jobs:
     name: 'Publish Bundle'
     runs-on: 'ubuntu-latest'
     outputs:
-      version: '${{ steps.version.outputs.version }}'
+      version: '${{ steps.vars.outputs.version }}'
     permissions:
       contents: 'read'
       packages: 'write'
@@ -46,37 +46,24 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: 'Install dependencies'
-        run: 'npm ci'
-
-      - name: 'Setup NPMRC'
-        uses: './.github/actions/setup-npmrc'
-        with:
-          github-token: '${{ secrets.GITHUB_TOKEN }}'
-
-      - name: 'Bundle'
-        run: 'npm run bundle'
-
-      - name: 'Prepare for GitHub release'
-        run: 'node scripts/prepare-github-release.js'
-
-      - name: 'Set CI Version'
-        id: 'version'
+      - name: 'Calculate Version and Tag'
+        id: 'vars'
         run: |
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           NEW_VERSION="${CURRENT_VERSION}-ci.${{ github.run_number }}.${{ github.sha }}"
           echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
-          npm version --no-git-tag-version "${NEW_VERSION}"
-
-      - name: 'Publish to GitHub Packages'
-        env:
-          NODE_AUTH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            npm publish --tag="pr-${{ github.event.pull_request.number }}"
+            echo "tag=pr-${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
           else
-            npm publish --tag="ci"
+            echo "tag=ci" >> "$GITHUB_OUTPUT"
           fi
+      - name: 'Publish Bundle'
+        uses: './.github/actions/publish-bundle'
+        with:
+          version: '${{ steps.vars.outputs.version }}'
+          tag: '${{ steps.vars.outputs.tag }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          package-scope: '${{ inputs.npm-registry-scope }}'
 
   build-and-publish-sandbox:
     name: 'Build and Publish Sandbox'

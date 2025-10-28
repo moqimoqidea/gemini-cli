@@ -764,19 +764,14 @@ class EditToolInvocation
           DEFAULT_DIFF_OPTIONS,
         );
 
-        let originallyProposedContent;
-        if (
+        const originallyProposedContent = safeLiteralReplace(
+          editData.currentContent as string,
+          this.params.old_string,
           this.params.ai_proposed_string !== null &&
-          this.params.ai_proposed_string !== undefined
-        ) {
-          originallyProposedContent = safeLiteralReplace(
-            editData.currentContent as string,
-            this.params.old_string,
-            this.params.ai_proposed_string,
-          );
-        } else {
-          originallyProposedContent = this.params.new_string;
-        }
+            this.params.ai_proposed_string !== undefined
+            ? this.params.ai_proposed_string
+            : this.params.new_string,
+        );
 
         console.log(
           `adib originallyProposedContent ${originallyProposedContent}`,

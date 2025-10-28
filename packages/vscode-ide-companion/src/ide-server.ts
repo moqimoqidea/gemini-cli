@@ -70,6 +70,7 @@ async function writePortAndWorkspace({
   );
 
   if (!portFile || !authToken) {
+    log('Missing portFile or authToken, cannot write port and workspace info.');
     return;
   }
 

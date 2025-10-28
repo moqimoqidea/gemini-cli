@@ -5,7 +5,8 @@
  */
 
 import type React from 'react';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
 import type { Mock } from 'vitest';
 import { vi } from 'vitest';
 import type { Key } from './KeypressContext.js';
@@ -46,7 +47,7 @@ class MockStdin extends EventEmitter {
   pause = vi.fn();
 
   write(text: string) {
-    this.emit('data', Buffer.from(text));
+    this.emit('data', text);
   }
 }
 
@@ -368,12 +369,67 @@ describe('KeypressContext - Kitty Protocol', () => {
         stdin.write(PASTE_END);
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         // Expect the handler to be called exactly once for the entire paste
         expect(keyHandler).toHaveBeenCalledTimes(1);
       });
 
       // Verify the single event contains the full pasted text
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paste: true,
+          sequence: pastedText,
+        }),
+      );
+    });
+    it('should paste start code split over multiple writes', async () => {
+      const keyHandler = vi.fn();
+      const pastedText = 'pasted content';
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        // Split PASTE_START into two parts
+        stdin.write(PASTE_START.slice(0, 3));
+        stdin.write(PASTE_START.slice(3));
+        stdin.write(pastedText);
+        stdin.write(PASTE_END);
+      });
+
+      await vi.waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledTimes(1);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paste: true,
+          sequence: pastedText,
+        }),
+      );
+    });
+
+    it('should paste end code split over multiple writes', async () => {
+      const keyHandler = vi.fn();
+      const pastedText = 'pasted content';
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        stdin.write(PASTE_START);
+        stdin.write(pastedText);
+        // Split PASTE_END into two parts
+        stdin.write(PASTE_END.slice(0, 3));
+        stdin.write(PASTE_END.slice(3));
+      });
+
+      await vi.waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledTimes(1);
+      });
+
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           paste: true,
@@ -1136,7 +1192,7 @@ describe('Kitty Sequence Parsing', () => {
     }
 
     // Should parse once complete
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'escape',

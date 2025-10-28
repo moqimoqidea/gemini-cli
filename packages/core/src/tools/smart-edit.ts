@@ -764,10 +764,31 @@ class EditToolInvocation
           DEFAULT_DIFF_OPTIONS,
         );
 
+        let originallyProposedContent;
+        if (
+          this.params.ai_proposed_string !== null &&
+          this.params.ai_proposed_string !== undefined
+        ) {
+          originallyProposedContent = safeLiteralReplace(
+            editData.currentContent as string,
+            this.params.old_string,
+            this.params.ai_proposed_string,
+          );
+        } else {
+          originallyProposedContent = this.params.new_string;
+        }
+
+        console.log(
+          `adib originallyProposedContent ${originallyProposedContent}`,
+        );
+        console.log(`editData.currentContent ${editData.currentContent}`);
+        console.log(`adib aipropsedstring ${this.params.ai_proposed_string}`);
+        console.log(`adib ${this.params.old_string}`);
+        console.log(`${this.params.new_string}`);
         const diffStat = getDiffStat(
           fileName,
           editData.currentContent ?? '',
-          editData.newContent,
+          originallyProposedContent,
           this.params.new_string,
         );
         displayResult = {

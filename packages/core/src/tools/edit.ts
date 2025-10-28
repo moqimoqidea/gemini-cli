@@ -386,8 +386,24 @@ class EditToolInvocation
         .writeTextFile(this.params.file_path, editData.newContent);
 
       const fileName = path.basename(this.params.file_path);
-      const originallyProposedContent =
-        this.params.ai_proposed_content || editData.newContent;
+
+      let originallyProposedContent;
+
+      if (
+        this.params.ai_proposed_content !== null &&
+        this.params.ai_proposed_content !== undefined
+      ) {
+        originallyProposedContent = safeLiteralReplace(
+          editData.currentContent as string,
+          this.params.old_string,
+          this.params.ai_proposed_content,
+        );
+      } else {
+        originallyProposedContent = editData.newContent;
+      }
+
+      console.log(`originallyProposedContent ${originallyProposedContent}`);
+
       const diffStat = getDiffStat(
         fileName,
         editData.currentContent ?? '',

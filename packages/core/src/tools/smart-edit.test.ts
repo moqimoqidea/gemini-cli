@@ -708,6 +708,7 @@ describe('SmartEditTool', () => {
           instruction: `Remove lines from the file`,
           old_string: file.toRemove,
           new_string: '', // Removing the content
+          ai_proposed_string: '',
         };
         const invocation = tool.build(params);
         const result = await invocation.execute(new AbortController().signal);

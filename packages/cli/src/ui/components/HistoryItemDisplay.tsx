@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { escapeAnsiCtrlCodes } from '../utils/textUtils.js';
 import type { HistoryItem } from '../types.js';
 import { UserMessage } from './messages/UserMessage.js';
@@ -26,13 +26,10 @@ import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import { Help } from './Help.js';
 import type { SlashCommand } from '../commands/types.js';
 import { ExtensionsList } from './views/ExtensionsList.js';
-import { getMCPServerStatus, recordSlowRender } from '@google/gemini-cli-core';
+import { getMCPServerStatus } from '@google/gemini-cli-core';
 import { ToolsList } from './views/ToolsList.js';
 import { McpStatus } from './views/McpStatus.js';
 import { ChatList } from './views/ChatList.js';
-import { useConfig } from '../contexts/ConfigContext.js';
-
-const SLOW_RENDER_MS = 200;
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
@@ -57,17 +54,6 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   embeddedShellFocused,
   availableTerminalHeightGemini,
 }) => {
-  const config = useConfig();
-  const startTime = useRef(Date.now());
-
-  useEffect(() => {
-    const endTime = Date.now();
-    const renderTime = endTime - startTime.current;
-
-    if (renderTime > SLOW_RENDER_MS) {
-      recordSlowRender(config);
-    }
-  }, [config]);
   const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
 
   return (

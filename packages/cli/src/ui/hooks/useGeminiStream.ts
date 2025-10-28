@@ -111,6 +111,7 @@ export const useGeminiStream = (
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
+  const activeQueryIdRef = useRef<string | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
@@ -126,47 +127,55 @@ export const useGeminiStream = (
     return new GitService(config.getProjectRoot(), storage);
   }, [config, storage]);
 
-  const [toolCalls, scheduleToolCalls, markToolsAsSubmitted] =
-    useReactToolScheduler(
-      async (completedToolCallsFromScheduler) => {
-        // This onComplete is called when ALL scheduled tools for a given batch are done.
-        if (completedToolCallsFromScheduler.length > 0) {
-          // Add the final state of these tools to the history for display.
-          addItem(
-            mapTrackedToolCallsToDisplay(
-              completedToolCallsFromScheduler as TrackedToolCall[],
-            ),
-            Date.now(),
-          );
-
-          // Record tool calls with full metadata before sending responses.
-          try {
-            const currentModel =
-              config.getGeminiClient().getCurrentSequenceModel() ??
-              config.getModel();
-            config
-              .getGeminiClient()
-              .getChat()
-              .recordCompletedToolCalls(
-                currentModel,
-                completedToolCallsFromScheduler,
-              );
-          } catch (error) {
-            console.error(
-              `Error recording completed tool call information: ${error}`,
-            );
-          }
-
-          // Handle tool response submission immediately when tools complete
-          await handleCompletedTools(
+  const [
+    toolCalls,
+    scheduleToolCalls,
+    markToolsAsSubmitted,
+    setToolCallsForDisplay,
+    cancelAllToolCalls,
+  ] = useReactToolScheduler(
+    async (completedToolCallsFromScheduler) => {
+      // This onComplete is called when ALL scheduled tools for a given batch are done.
+      if (completedToolCallsFromScheduler.length > 0) {
+        // Add the final state of these tools to the history for display.
+        addItem(
+          mapTrackedToolCallsToDisplay(
             completedToolCallsFromScheduler as TrackedToolCall[],
+          ),
+          Date.now(),
+        );
+
+        // Clear the live-updating display now that the final state is in history.
+        setToolCallsForDisplay([]);
+
+        // Record tool calls with full metadata before sending responses.
+        try {
+          const currentModel =
+            config.getGeminiClient().getCurrentSequenceModel() ??
+            config.getModel();
+          config
+            .getGeminiClient()
+            .getChat()
+            .recordCompletedToolCalls(
+              currentModel,
+              completedToolCallsFromScheduler,
+            );
+        } catch (error) {
+          console.error(
+            `Error recording completed tool call information: ${error}`,
           );
         }
-      },
-      config,
-      getPreferredEditor,
-      onEditorClose,
-    );
+
+        // Handle tool response submission immediately when tools complete
+        await handleCompletedTools(
+          completedToolCallsFromScheduler as TrackedToolCall[],
+        );
+      }
+    },
+    config,
+    getPreferredEditor,
+    onEditorClose,
+  );
 
   const pendingToolCallGroupDisplay = useMemo(
     () =>
@@ -185,6 +194,8 @@ export const useGeminiStream = (
     return undefined;
   }, [toolCalls]);
 
+  const lastQueryRef = useRef<PartListUnion | null>(null);
+  const lastPromptIdRef = useRef<string | null>(null);
   const loopDetectedRef = useRef(false);
   const [
     loopDetectionConfirmationRequest,
@@ -263,27 +274,54 @@ export const useGeminiStream = (
   }, [streamingState, config, history]);
 
   const cancelOngoingRequest = useCallback(() => {
-    if (streamingState !== StreamingState.Responding) {
+    if (
+      streamingState !== StreamingState.Responding &&
+      streamingState !== StreamingState.WaitingForConfirmation
+    ) {
       return;
     }
     if (turnCancelledRef.current) {
       return;
     }
     turnCancelledRef.current = true;
-    abortControllerRef.current?.abort();
+
+    // A full cancellation means no tools have produced a final result yet.
+    // This determines if we show a generic "Request cancelled" message.
+    const isFullCancellation = !toolCalls.some(
+      (tc) => tc.status === 'success' || tc.status === 'error',
+    );
+
+    // Ensure we have an abort controller, creating one if it doesn't exist.
+    if (!abortControllerRef.current) {
+      abortControllerRef.current = new AbortController();
+    }
+
+    // The order is important here.
+    // 1. Fire the signal to interrupt any active async operations.
+    abortControllerRef.current.abort();
+    // 2. Call the imperative cancel to clear the queue of pending tools.
+    cancelAllToolCalls(abortControllerRef.current.signal);
+
     if (pendingHistoryItemRef.current) {
       addItem(pendingHistoryItemRef.current, Date.now());
     }
-    addItem(
-      {
-        type: MessageType.INFO,
-        text: 'Request cancelled.',
-      },
-      Date.now(),
-    );
     setPendingHistoryItem(null);
+
+    // If it was a full cancellation, add the info message now.
+    // Otherwise, we let handleCompletedTools figure out the next step,
+    // which might involve sending partial results back to the model.
+    if (isFullCancellation) {
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: 'Request cancelled.',
+        },
+        Date.now(),
+      );
+      setIsResponding(false);
+    }
+
     onCancelSubmit();
-    setIsResponding(false);
     setShellInputFocused(false);
   }, [
     streamingState,
@@ -292,6 +330,8 @@ export const useGeminiStream = (
     onCancelSubmit,
     pendingHistoryItemRef,
     setShellInputFocused,
+    cancelAllToolCalls,
+    toolCalls,
   ]);
 
   useKeypress(
@@ -300,7 +340,11 @@ export const useGeminiStream = (
         cancelOngoingRequest();
       }
     },
-    { isActive: streamingState === StreamingState.Responding },
+    {
+      isActive:
+        streamingState === StreamingState.Responding ||
+        streamingState === StreamingState.WaitingForConfirmation,
+    },
   );
 
   const prepareQueryForGemini = useCallback(
@@ -327,41 +371,43 @@ export const useGeminiStream = (
         onDebugMessage(`User query: '${trimmedQuery}'`);
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
 
-        // Handle UI-only commands first
-        const slashCommandResult = isSlashCommand(trimmedQuery)
-          ? await handleSlashCommand(trimmedQuery)
-          : false;
+        if (!shellModeActive) {
+          // Handle UI-only commands first
+          const slashCommandResult = isSlashCommand(trimmedQuery)
+            ? await handleSlashCommand(trimmedQuery)
+            : false;
 
-        if (slashCommandResult) {
-          switch (slashCommandResult.type) {
-            case 'schedule_tool': {
-              const { toolName, toolArgs } = slashCommandResult;
-              const toolCallRequest: ToolCallRequestInfo = {
-                callId: `${toolName}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                name: toolName,
-                args: toolArgs,
-                isClientInitiated: true,
-                prompt_id,
-              };
-              scheduleToolCalls([toolCallRequest], abortSignal);
-              return { queryToSend: null, shouldProceed: false };
-            }
-            case 'submit_prompt': {
-              localQueryToSendToGemini = slashCommandResult.content;
+          if (slashCommandResult) {
+            switch (slashCommandResult.type) {
+              case 'schedule_tool': {
+                const { toolName, toolArgs } = slashCommandResult;
+                const toolCallRequest: ToolCallRequestInfo = {
+                  callId: `${toolName}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                  name: toolName,
+                  args: toolArgs,
+                  isClientInitiated: true,
+                  prompt_id,
+                };
+                scheduleToolCalls([toolCallRequest], abortSignal);
+                return { queryToSend: null, shouldProceed: false };
+              }
+              case 'submit_prompt': {
+                localQueryToSendToGemini = slashCommandResult.content;
 
-              return {
-                queryToSend: localQueryToSendToGemini,
-                shouldProceed: true,
-              };
-            }
-            case 'handled': {
-              return { queryToSend: null, shouldProceed: false };
-            }
-            default: {
-              const unreachable: never = slashCommandResult;
-              throw new Error(
-                `Unhandled slash command result type: ${unreachable}`,
-              );
+                return {
+                  queryToSend: localQueryToSendToGemini,
+                  shouldProceed: true,
+                };
+              }
+              case 'handled': {
+                return { queryToSend: null, shouldProceed: false };
+              }
+              default: {
+                const unreachable: never = slashCommandResult;
+                throw new Error(
+                  `Unhandled slash command result type: ${unreachable}`,
+                );
+              }
             }
           }
         }
@@ -666,39 +712,6 @@ export const useGeminiStream = (
     [addItem, onCancelSubmit, config],
   );
 
-  const handleLoopDetectionConfirmation = useCallback(
-    (result: { userSelection: 'disable' | 'keep' }) => {
-      setLoopDetectionConfirmationRequest(null);
-
-      if (result.userSelection === 'disable') {
-        config.getGeminiClient().getLoopDetectionService().disableForSession();
-        addItem(
-          {
-            type: 'info',
-            text: `Loop detection has been disabled for this session. Please try your request again.`,
-          },
-          Date.now(),
-        );
-      } else {
-        addItem(
-          {
-            type: 'info',
-            text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
-          },
-          Date.now(),
-        );
-      }
-    },
-    [config, addItem],
-  );
-
-  const handleLoopDetectedEvent = useCallback(() => {
-    // Show the confirmation dialog to choose whether to disable loop detection
-    setLoopDetectionConfirmationRequest({
-      onComplete: handleLoopDetectionConfirmation,
-    });
-  }, [handleLoopDetectionConfirmation]);
-
   const processGeminiStreamEvents = useCallback(
     async (
       stream: AsyncIterable<GeminiEvent>,
@@ -793,6 +806,8 @@ export const useGeminiStream = (
       options?: { isContinuation: boolean },
       prompt_id?: string,
     ) => {
+      const queryId = `${Date.now()}-${Math.random()}`;
+      activeQueryIdRef.current = queryId;
       if (
         (streamingState === StreamingState.Responding ||
           streamingState === StreamingState.WaitingForConfirmation) &&
@@ -848,6 +863,10 @@ export const useGeminiStream = (
         setIsResponding(true);
         setInitError(null);
 
+        // Store query and prompt_id for potential retry on loop detection
+        lastQueryRef.current = queryToSend;
+        lastPromptIdRef.current = prompt_id;
+
         try {
           const stream = geminiClient.sendMessageStream(
             queryToSend,
@@ -870,7 +889,42 @@ export const useGeminiStream = (
           }
           if (loopDetectedRef.current) {
             loopDetectedRef.current = false;
-            handleLoopDetectedEvent();
+            // Show the confirmation dialog to choose whether to disable loop detection
+            setLoopDetectionConfirmationRequest({
+              onComplete: (result: { userSelection: 'disable' | 'keep' }) => {
+                setLoopDetectionConfirmationRequest(null);
+
+                if (result.userSelection === 'disable') {
+                  config
+                    .getGeminiClient()
+                    .getLoopDetectionService()
+                    .disableForSession();
+                  addItem(
+                    {
+                      type: 'info',
+                      text: `Loop detection has been disabled for this session. Retrying request...`,
+                    },
+                    Date.now(),
+                  );
+
+                  if (lastQueryRef.current && lastPromptIdRef.current) {
+                    submitQuery(
+                      lastQueryRef.current,
+                      { isContinuation: true },
+                      lastPromptIdRef.current,
+                    );
+                  }
+                } else {
+                  addItem(
+                    {
+                      type: 'info',
+                      text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
+                    },
+                    Date.now(),
+                  );
+                }
+              },
+            });
           }
         } catch (error: unknown) {
           if (error instanceof UnauthorizedError) {
@@ -891,7 +945,9 @@ export const useGeminiStream = (
             );
           }
         } finally {
-          setIsResponding(false);
+          if (activeQueryIdRef.current === queryId) {
+            setIsResponding(false);
+          }
         }
       });
     },
@@ -909,7 +965,6 @@ export const useGeminiStream = (
       config,
       startNewPrompt,
       getPromptCount,
-      handleLoopDetectedEvent,
     ],
   );
 
@@ -954,10 +1009,6 @@ export const useGeminiStream = (
 
   const handleCompletedTools = useCallback(
     async (completedToolCallsFromScheduler: TrackedToolCall[]) => {
-      if (isResponding) {
-        return;
-      }
-
       const completedAndReadyToSubmitTools =
         completedToolCallsFromScheduler.filter(
           (
@@ -1019,6 +1070,19 @@ export const useGeminiStream = (
       );
 
       if (allToolsCancelled) {
+        // If the turn was cancelled via the imperative escape key flow,
+        // the cancellation message is added there. We check the ref to avoid duplication.
+        if (!turnCancelledRef.current) {
+          addItem(
+            {
+              type: MessageType.INFO,
+              text: 'Request cancelled.',
+            },
+            Date.now(),
+          );
+        }
+        setIsResponding(false);
+
         if (geminiClient) {
           // We need to manually add the function responses to the history
           // so the model knows the tools were cancelled.
@@ -1065,12 +1129,12 @@ export const useGeminiStream = (
       );
     },
     [
-      isResponding,
       submitQuery,
       markToolsAsSubmitted,
       geminiClient,
       performMemoryRefresh,
       modelSwitchedFromQuotaError,
+      addItem,
     ],
   );
 

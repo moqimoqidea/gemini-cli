@@ -93,6 +93,7 @@ describe('Telemetry Metrics', () => {
   let recordGenAiClientOperationDurationModule: typeof import('./metrics.js').recordGenAiClientOperationDuration;
   let recordFlickerFrameModule: typeof import('./metrics.js').recordFlickerFrame;
   let recordSlowRenderModule: typeof import('./metrics.js').recordSlowRender;
+  let recordExitFailModule: typeof import('./metrics.js').recordExitFail;
   let recordAgentRunMetricsModule: typeof import('./metrics.js').recordAgentRunMetrics;
 
   beforeEach(async () => {
@@ -134,6 +135,7 @@ describe('Telemetry Metrics', () => {
     recordGenAiClientOperationDurationModule =
       metricsJsModule.recordGenAiClientOperationDuration;
     recordFlickerFrameModule = metricsJsModule.recordFlickerFrame;
+    recordExitFailModule = metricsJsModule.recordExitFail;
     recordSlowRenderModule = metricsJsModule.recordSlowRender;
     recordAgentRunMetricsModule = metricsJsModule.recordAgentRunMetrics;
 
@@ -163,6 +165,28 @@ describe('Telemetry Metrics', () => {
       recordFlickerFrameModule(config);
 
       // Called for session, then for flicker
+      expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
+      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
+        'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
+      });
+    });
+  });
+
+  describe('recordExitFail', () => {
+    it('does not record metrics if not initialized', () => {
+      const config = makeFakeConfig({});
+      recordExitFailModule(config);
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('records a exit fail event when initialized', () => {
+      const config = makeFakeConfig({});
+      initializeMetricsModule(config);
+      recordExitFailModule(config);
+
+      // Called for session, then for exit fail
       expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
       expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
         'session.id': 'test-session-id',
@@ -335,14 +359,14 @@ describe('Telemetry Metrics', () => {
       mockCounterAddFn.mockClear();
 
       recordTokenUsageMetricsModule(mockConfig, 200, {
-        model: 'gemini-ultra',
+        model: 'gemini-different-model',
         type: 'input',
       });
       expect(mockCounterAddFn).toHaveBeenCalledWith(200, {
         'session.id': 'test-session-id',
         'installation.id': 'test-installation-id',
         'user.email': 'test@example.com',
-        model: 'gemini-ultra',
+        model: 'gemini-different-model',
         type: 'input',
       });
     });

@@ -150,6 +150,11 @@ Each server configuration supports the following properties:
   server. Tools listed here will not be available to the model, even if they are
   exposed by the server. **Note:** `excludeTools` takes precedence over
   `includeTools` - if a tool is in both lists, it will be excluded.
+- **`allow_unscoped_id_tokens_cloud_run`** (boolean): When `true` and the MCP
+  server host is a Cloud Run service (`*.run.app`), the CLI will use Google
+  Application Default Credentials (ADC) to generate an unscoped ID token and
+  send it as `Authorization: Bearer <token>`. When using this flag, do not set
+  OAuth scopes; they are not needed.
 - **`targetAudience`** (string): The OAuth Client ID allowlisted on the
   IAP-protected application you are trying to access. Used with
   `authProviderType: 'service_account_impersonation'`.
@@ -280,6 +285,26 @@ property:
   }
 }
 ```
+
+#### Google Credential with Cloud Run ID tokens
+
+When connecting to a Cloud Run service endpoint (`*.run.app`), you must opt into
+ID token based authentication using ADC. Note that the generated ID token is
+unscoped.
+
+```json
+{
+  "mcpServers": {
+    "googleCloudServer": {
+      "url": "https://my-gcp-service.run.app/sse",
+      "authProviderType": "google_credentials",
+      "allow_unscoped_id_tokens_cloud_run": true
+    }
+  }
+}
+```
+
+Note: Only `*.run.app` hosts are supported for this flag.
 
 #### Service Account Impersonation
 
@@ -930,7 +955,7 @@ This is the default transport for running local servers.
 gemini mcp add <name> <command> [args...]
 
 # Example: Adding a local server
-gemini mcp add my-stdio-server -e API_KEY=123 /path/to/server arg1 arg2 arg3
+gemini mcp add -e API_KEY=123 my-stdio-server /path/to/server arg1 arg2 arg3
 
 # Example: Adding a local python server
 gemini mcp add python-server python server.py --port 8080
@@ -948,7 +973,7 @@ gemini mcp add --transport http <name> <url>
 gemini mcp add --transport http http-server https://api.example.com/mcp/
 
 # Example: Adding an HTTP server with an authentication header
-gemini mcp add --transport http secure-http https://api.example.com/mcp/ --header "Authorization: Bearer abc123"
+gemini mcp add --transport http --header "Authorization: Bearer abc123" secure-http https://api.example.com/mcp/
 ```
 
 #### Adding an SSE server
@@ -963,7 +988,7 @@ gemini mcp add --transport sse <name> <url>
 gemini mcp add --transport sse sse-server https://api.example.com/sse/
 
 # Example: Adding an SSE server with an authentication header
-gemini mcp add --transport sse secure-sse https://api.example.com/sse/ --header "Authorization: Bearer abc123"
+gemini mcp add --transport sse --header "Authorization: Bearer abc123" secure-sse https://api.example.com/sse/
 ```
 
 ### Listing Servers (`gemini mcp list`)

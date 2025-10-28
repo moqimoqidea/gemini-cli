@@ -716,7 +716,6 @@ describe('mergeMcpServers', () => {
         path: '/path/to/ext1',
         name: 'ext1',
         id: 'ext1-id',
-
         version: '1.0.0',
         mcpServers: {
           'ext1-server': {
@@ -732,6 +731,76 @@ describe('mergeMcpServers', () => {
     const argv = await parseArguments({} as Settings);
     await loadCliConfig(settings, extensions, 'test-session', argv);
     expect(settings).toEqual(originalSettings);
+  });
+
+  it('should resolve auth modules relative to the workspace', async () => {
+    const workspaceDir = path.resolve(path.sep, 'home', 'user', 'project');
+    const settings: Settings = {
+      mcpServers: {
+        custom: {
+          url: 'http://localhost:8080',
+          auth: {
+            module: './auth/provider.js',
+          },
+        },
+      },
+    };
+
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      settings,
+      [],
+      'test-session',
+      argv,
+      workspaceDir,
+    );
+
+    const servers = config.getMcpServers();
+    expect(servers?.['custom']?.auth?.module).toBe(
+      path.resolve(workspaceDir, 'auth/provider.js'),
+    );
+  });
+
+  it('should resolve extension auth modules relative to the extension path', async () => {
+    const workspaceDir = path.resolve(path.sep, 'home', 'user', 'project');
+    const extensionRoot = path.resolve(path.sep, 'cli', 'path1');
+    const settings: Settings = {
+      mcpServers: {},
+    };
+    const extensions: GeminiCLIExtension[] = [
+      {
+        path: extensionRoot,
+        name: 'ext-auth',
+        id: 'ext-auth-id',
+        version: '1.0.0',
+        mcpServers: {
+          'ext-server': {
+            url: 'http://localhost:8081',
+            auth: {
+              module: './dist/provider.js',
+            },
+          },
+        },
+        contextFiles: [],
+        isActive: true,
+      },
+    ];
+
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      settings,
+      extensions,
+      'test-session',
+      argv,
+      workspaceDir,
+    );
+
+    const servers = config.getMcpServers();
+    expect(servers?.['ext-server']?.auth?.module).toBe(
+      path.resolve(extensionRoot, 'dist/provider.js'),
+    );
   });
 });
 

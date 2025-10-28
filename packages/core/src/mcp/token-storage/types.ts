@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { AuthModuleConfig } from '../../config/config.js';
+
 /**
  * Interface for OAuth tokens.
  */
@@ -24,6 +26,7 @@ export interface OAuthCredentials {
   clientId?: string;
   tokenUrl?: string;
   mcpServerUrl?: string;
+  authModule?: AuthModuleConfig;
   updatedAt: number;
 }
 

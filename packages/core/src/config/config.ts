@@ -139,6 +139,12 @@ export interface GeminiCLIExtension {
   id: string;
 }
 
+export interface AuthModuleConfig {
+  module: string;
+  export?: string;
+  options?: Record<string, unknown>;
+}
+
 export interface ExtensionInstallMetadata {
   source: string;
   type: 'git' | 'local' | 'link' | 'github-release';
@@ -196,6 +202,7 @@ export class MCPServerConfig {
     readonly targetAudience?: string,
     /* targetServiceAccount format: <service-account-name>@<project-num>.iam.gserviceaccount.com */
     readonly targetServiceAccount?: string,
+    readonly auth?: AuthModuleConfig,
   ) {}
 }
 

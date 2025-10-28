@@ -32,6 +32,7 @@ import { mcpToTool } from '@google/genai';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
+import { loadAuthProviderFromModule } from '../mcp/auth-module-loader.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
@@ -1146,6 +1147,34 @@ export async function createTransport(
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
 ): Promise<Transport> {
+  if (mcpServerConfig.auth) {
+    const provider = await loadAuthProviderFromModule(
+      mcpServerName,
+      mcpServerConfig,
+      mcpServerConfig.auth,
+    );
+    const transportOptions:
+      | StreamableHTTPClientTransportOptions
+      | SSEClientTransportOptions = {
+      authProvider: provider,
+    };
+
+    if (mcpServerConfig.httpUrl) {
+      return new StreamableHTTPClientTransport(
+        new URL(mcpServerConfig.httpUrl),
+        transportOptions,
+      );
+    } else if (mcpServerConfig.url) {
+      return new SSEClientTransport(
+        new URL(mcpServerConfig.url),
+        transportOptions,
+      );
+    }
+
+    throw new Error(
+      `No URL configured for MCP server '${mcpServerName}' with custom auth`,
+    );
+  }
   if (
     mcpServerConfig.authProviderType ===
     AuthProviderType.SERVICE_ACCOUNT_IMPERSONATION

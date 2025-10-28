@@ -14,11 +14,18 @@ import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import { GEMINI_DIR } from '@google/gemini-cli-core';
 
-vi.mock('node:fs/promises', () => ({
-  readFile: vi.fn(),
-  writeFile: vi.fn(),
-  mkdir: vi.fn(),
-}));
+vi.mock('node:fs/promises', () => {
+  const api = {
+    readFile: vi.fn(),
+    writeFile: vi.fn(),
+    mkdir: vi.fn(),
+    access: vi.fn(),
+  };
+  return {
+    ...api,
+    default: api,
+  };
+});
 vi.mock('node:os');
 vi.mock('node:crypto');
 vi.mock('node:fs', async (importOriginal) => {

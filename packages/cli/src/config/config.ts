@@ -429,7 +429,7 @@ export async function loadCliConfig(
       memoryFileFiltering,
     );
 
-  let mcpServers = mergeMcpServers(settings, allExtensions);
+  let mcpServers = mergeMcpServers(settings, allExtensions, cwd);
   const question = argv.promptInteractive || argv.prompt || '';
 
   // Determine approval mode with backward compatibility
@@ -701,25 +701,60 @@ function allowedMcpServers(
   return mcpServers;
 }
 
-function mergeMcpServers(settings: Settings, extensions: GeminiCLIExtension[]) {
-  const mcpServers = { ...(settings.mcpServers || {}) };
+function resolveAuthModule(
+  auth: MCPServerConfig['auth'] | undefined,
+  workspaceDir: string,
+  extension?: GeminiCLIExtension,
+): MCPServerConfig['auth'] | undefined {
+  if (!auth || !auth.module) {
+    return auth;
+  }
+
+  const modulePath = auth.module;
+  if (path.isAbsolute(modulePath)) {
+    return { ...auth, module: modulePath };
+  }
+
+  const baseDir = extension?.path ?? workspaceDir;
+  const resolvedPath = path.resolve(baseDir, modulePath);
+  return { ...auth, module: resolvedPath };
+}
+
+function mergeMcpServers(
+  settings: Settings,
+  extensions: GeminiCLIExtension[],
+  workspaceDir: string,
+) {
+  const mcpServers: Record<string, MCPServerConfig> = {};
+
+  for (const [name, server] of Object.entries(settings.mcpServers || {})) {
+    mcpServers[name] = {
+      ...server,
+      auth: resolveAuthModule(server.auth, workspaceDir),
+    };
+  }
+
   for (const extension of extensions) {
     if (!extension.isActive) {
       continue;
     }
-    Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
+
+    for (const [key, server] of Object.entries(extension.mcpServers || {})) {
       if (mcpServers[key]) {
         debugLogger.warn(
           `Skipping extension MCP config for server with key "${key}" as it already exists.`,
         );
-        return;
+        continue;
       }
+
       mcpServers[key] = {
         ...server,
         extension,
+        auth: resolveAuthModule(server.auth, workspaceDir, extension),
       };
-    });
+    }
   }
+
   return mcpServers;
 }
 

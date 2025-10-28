@@ -8,6 +8,7 @@ import { coreEvents } from '@google/gemini-cli-core';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
+import type { AuthModuleConfig } from '../config/config.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type {
   OAuthToken,
@@ -122,6 +123,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
    * @param clientId Optional client ID used for this token
    * @param tokenUrl Optional token URL used for this token
    * @param mcpServerUrl Optional MCP server URL
+   * @param authModule Optional auth module reference used to obtain the token
    */
   async saveToken(
     serverName: string,
@@ -129,6 +131,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
     clientId?: string,
     tokenUrl?: string,
     mcpServerUrl?: string,
+    authModule?: AuthModuleConfig,
   ): Promise<void> {
     await this.ensureConfigDir();
 
@@ -138,6 +141,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
       clientId,
       tokenUrl,
       mcpServerUrl,
+      authModule,
       updatedAt: Date.now(),
     };
 

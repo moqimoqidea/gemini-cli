@@ -748,7 +748,7 @@ describe('EditTool', () => {
         old_string: 'old',
         new_string: 'new',
         modified_by_user: true,
-        ai_proposed_content: 'AI',
+        ai_proposed_content: 'Line 1\nAI line\nLine 3\nLine 4\nLine 5\n',
       };
 
       (mockConfig.getApprovalMode as Mock).mockReturnValueOnce(

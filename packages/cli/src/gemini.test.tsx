@@ -481,16 +481,6 @@ describe('startInteractiveUI', () => {
     expect(reactElement).toBeDefined();
   });
 
-  it('should log slow renders', async () => {
-    await startInteractiveUI(
-      mockConfig,
-      mockSettings,
-      mockStartupWarnings,
-      mockWorkspaceRoot,
-      mockInitializationResult,
-    );
-  });
-
   it('should perform all startup tasks in correct order', async () => {
     const { getCliVersion } = await import('./utils/version.js');
     const { checkForUpdates } = await import('./ui/utils/updateCheck.js');

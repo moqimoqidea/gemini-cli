@@ -63,8 +63,8 @@ export async function readStdin(): Promise<string> {
       process.stdin.removeListener('error', onError);
     };
 
-    process.stdin.once('readable', onReadable);
-    process.stdin.once('end', onEnd);
-    process.stdin.once('error', onError);
+    process.stdin.on('readable', onReadable);
+    process.stdin.on('end', onEnd);
+    process.stdin.on('error', onError);
   });
 }

@@ -37,7 +37,6 @@ import {
   tokenLimit,
   debugLogger,
   runInDevTraceSpan,
-  uiTelemetryService,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -655,7 +654,6 @@ export const useGeminiStream = (
       eventValue: ServerGeminiChatCompressedEvent['value'],
       userMessageTimestamp: number,
     ) => {
-      uiTelemetryService.setLastPromptTokenCount(eventValue!.newTokenCount);
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);

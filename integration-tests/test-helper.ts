@@ -220,6 +220,13 @@ export class InteractiveRun {
     }
   }
 
+  // Types an entire string at once, necessary for some things like commands
+  // but may run into paste detection issues for larger strings.
+  async sendText(text: string) {
+    this.ptyProcess.write(text);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+
   // Simulates typing a string one character at a time to avoid paste detection.
   async sendKeys(text: string) {
     const delay = 5;

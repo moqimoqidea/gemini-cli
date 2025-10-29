@@ -79,7 +79,7 @@ export class AdkToolAdapter extends AdkBaseTool {
         confirmationDetails,
       });
     }
-
+    // Wait for response..then handle.
     const result = await invocation.execute(abortController.signal);
     return result;
   }

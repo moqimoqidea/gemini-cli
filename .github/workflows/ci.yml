@@ -18,7 +18,8 @@ defaults:
 
 jobs:
   test_linux:
-runs-on: 'ubuntu-latest'
+    name: 'Test (Linux)'
+    runs-on: 'ubuntu-latest'
     strategy:
       fail-fast: false
       matrix:

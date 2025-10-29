@@ -404,7 +404,7 @@ export class CoreToolScheduler {
             request: {
               callId: request.correlationId,
               name: request.tool.name,
-              args: request.requestArgs,
+              args: request.toolArgs,
               isClientInitiated: true,
               prompt_id: '',
             },

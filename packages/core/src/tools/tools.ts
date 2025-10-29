@@ -12,6 +12,7 @@ import { SchemaValidator } from '../utils/schemaValidator.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { randomUUID } from 'node:crypto';
+import { BaseTool as AdkBaseTool, type RunAsyncToolRequest } from '@google/adk';
 import {
   MessageBusType,
   type ToolConfirmationRequest,
@@ -712,4 +713,44 @@ export interface ToolLocation {
   path: string;
   // Which line (if known)
   line?: number;
+}
+
+/**
+ * An adapter that wraps a gemini-cli DeclarativeTool to make it compatible
+ * with the adk LlmAgent.
+ */
+export class AdkToolAdapter extends AdkBaseTool {
+  constructor(
+    readonly tool: AnyDeclarativeTool,
+    readonly messageBus: MessageBus,
+  ) {
+    super(tool);
+  }
+
+  override _getDeclaration(): FunctionDeclaration | undefined {
+    return this.tool.schema;
+  }
+
+  async runAsync(request: RunAsyncToolRequest): Promise<unknown> {
+    const invocation = this.tool.build(request.args);
+    const abortController = new AbortController();
+
+    // const confirmationDetails = await invocation.shouldConfirmExecute(
+    //   abortController.signal,
+    // );
+
+    // if (confirmationDetails) {
+    //   this.messageBus.publish({
+    //     type: MessageBusType.TOOL_CONFIRMATION_DISPLAY_REQUEST,
+    //     correlationId: randomUUID(),
+    //     tool: this.tool,
+    //     invocation,
+    //     toolArgs: request.args,
+    //     confirmationDetails,
+    //   });
+    // }
+    // Wait for response..then handle.
+    const result = await invocation.execute(abortController.signal);
+    return result;
+  }
 }

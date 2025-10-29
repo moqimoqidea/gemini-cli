@@ -32,7 +32,7 @@ export interface ToolConfirmationDisplayRequest {
   correlationId: string;
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
-  requestArgs: Record<string, unknown>;
+  toolArgs: Record<string, unknown>;
   confirmationDetails: ToolCallConfirmationDetails;
 }
 

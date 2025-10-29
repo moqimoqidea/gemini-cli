@@ -28,9 +28,8 @@ import {
   DEFAULT_TOP_P,
 } from '../config/models.js';
 import type { Part, FunctionDeclaration, Schema } from '@google/genai';
-import { BaseTool as AdkBaseTool, type RunAsyncToolRequest } from '@google/adk';
 import { convertInputConfigToGenaiSchema } from './schema-converter.js';
-import type { AnyDeclarativeTool } from '../tools/tools.js';
+import { AdkToolAdapter, type AnyDeclarativeTool } from '../tools/tools.js';
 import * as os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import type { ActivityCallback } from './executor.js';
@@ -42,48 +41,7 @@ import { parseThought } from '../utils/thoughtUtils.js';
 import { templateString } from './utils.js';
 import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
 import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
-import { MessageBusType } from '../confirmation-bus/types.js';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
-
-/**
- * An adapter that wraps a gemini-cli DeclarativeTool to make it compatible
- * with the adk LlmAgent.
- */
-export class AdkToolAdapter extends AdkBaseTool {
-  constructor(
-    readonly tool: AnyDeclarativeTool,
-    readonly messageBus: MessageBus,
-  ) {
-    super(tool);
-  }
-
-  override _getDeclaration(): FunctionDeclaration | undefined {
-    return this.tool.schema;
-  }
-
-  async runAsync(request: RunAsyncToolRequest): Promise<unknown> {
-    const invocation = this.tool.build(request.args);
-    const abortController = new AbortController();
-
-    const confirmationDetails = await invocation.shouldConfirmExecute(
-      abortController.signal,
-    );
-
-    if (confirmationDetails) {
-      this.messageBus.publish({
-        type: MessageBusType.TOOL_CONFIRMATION_DISPLAY_REQUEST,
-        correlationId: randomUUID(),
-        tool: this.tool,
-        invocation,
-        requestArgs: request.args,
-        confirmationDetails,
-      });
-    }
-    // Wait for response..then handle.
-    const result = await invocation.execute(abortController.signal);
-    return result;
-  }
-}
+import { MessageBusPlugin } from '../confirmation-bus/message-bus-plugin.js';
 
 async function createAdkAgent<TOutput extends z.ZodTypeAny>(
   config: Config,
@@ -263,9 +221,14 @@ export class AdkAgentExecutor<TOutput extends z.ZodTypeAny>
       const sessionId = this.config.getSessionId();
       const userId = os.userInfo().username || randomUUID();
 
+      const messageBusPlugin = new MessageBusPlugin(
+        this.config.getMessageBus(),
+      );
+
       const runner = new InMemoryRunner({
         agent: adkAgent,
         appName: this.agentId,
+        plugins: [messageBusPlugin],
       });
 
       await runner.sessionService.createSession({

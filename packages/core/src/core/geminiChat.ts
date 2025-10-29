@@ -145,36 +145,18 @@ function validateHistory(history: HistoryContent[]) {
 function extractCuratedHistory(
   comprehensiveHistory: HistoryContent[],
 ): HistoryContent[] {
-  if (comprehensiveHistory === undefined || comprehensiveHistory.length === 0) {
+  if (!comprehensiveHistory) {
     return [];
   }
-  const curatedHistory: HistoryContent[] = [];
-  const length = comprehensiveHistory.length;
-  let i = 0;
-  while (i < length) {
-    if (comprehensiveHistory[i].role === 'user') {
-      curatedHistory.push(comprehensiveHistory[i]);
-      i++;
-    } else {
-      const modelOutput: HistoryContent[] = [];
-      let isValid = true;
-      while (i < length && comprehensiveHistory[i].role === 'model') {
-        const currentContent = comprehensiveHistory[i];
-        modelOutput.push(currentContent);
-        if (
-          isValid &&
-          (!isValidContent(currentContent) || currentContent.isPartial)
-        ) {
-          isValid = false;
-        }
-        i++;
-      }
-      if (isValid) {
-        curatedHistory.push(...modelOutput);
-      }
+  // Filter out model turns that are marked as partial (incomplete stream) or
+  // contain invalid content (e.g., empty parts from safety filtering).
+  // User turns are always included.
+  return comprehensiveHistory.filter((content) => {
+    if (content.role === 'user') {
+      return true;
     }
-  }
-  return curatedHistory;
+    return !content.isPartial && isValidContent(content);
+  });
 }
 
 /**
@@ -284,6 +266,17 @@ export class GeminiChat {
           attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
           attempt++
         ) {
+          // A partial response object is added to the history at the start of
+          // each attempt. It will be populated with streaming content. If the
+          // attempt fails, it's removed by the catch block. If it succeeds,
+          // it remains in the history.
+          const partialResponse: HistoryContent = {
+            role: 'model',
+            parts: [],
+            isPartial: true,
+          };
+          self.history.push(partialResponse);
+
           try {
             if (attempt > 0) {
               yield { type: StreamEventType.RETRY };
@@ -303,6 +296,7 @@ export class GeminiChat {
               requestContents,
               currentParams,
               prompt_id,
+              partialResponse,
             );
 
             for await (const chunk of stream) {
@@ -313,6 +307,15 @@ export class GeminiChat {
             break;
           } catch (error) {
             lastError = error;
+
+            // The attempt failed. If a partial model response was added for this
+            // attempt, remove it to ensure a clean state for the next retry or
+            // for the final failure state.
+            const lastHistoryEntry = self.history[self.history.length - 1];
+            if (lastHistoryEntry?.role === 'model') {
+              self.history.pop();
+            }
+
             const isContentError = error instanceof InvalidStreamError;
 
             if (isContentError) {
@@ -365,6 +368,7 @@ export class GeminiChat {
     requestContents: Content[],
     params: SendMessageParameters,
     prompt_id: string,
+    partialResponse: HistoryContent,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const apiCall = () => {
       const modelToUse = getEffectiveModel(
@@ -403,7 +407,7 @@ export class GeminiChat {
       signal: params.config?.abortSignal,
     });
 
-    return this.processStreamResponse(model, streamResponse);
+    return this.processStreamResponse(model, streamResponse, partialResponse);
   }
 
   /**
@@ -454,6 +458,17 @@ export class GeminiChat {
 
   setHistory(history: HistoryContent[]): void {
     this.history = history;
+  }
+
+  /**
+   * Commits a partial (e.g., from a cancelled request) response to the
+   * definitive history.
+   */
+  commitCancelledResponse(finalPartialContent: HistoryContent): void {
+    // Remove any existing item that was marked as partial
+    this.history = this.history.filter((item) => !item.isPartial);
+    // Add the final version of the partial content, ensuring it's marked as partial.
+    this.history.push({ ...finalPartialContent, isPartial: true });
   }
 
   stripThoughtsFromHistory(): void {
@@ -508,15 +523,9 @@ export class GeminiChat {
   private async *processStreamResponse(
     model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
+    partialResponse: HistoryContent,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
-    const partialResponse: HistoryContent = {
-      role: 'model',
-      parts: [],
-      isPartial: true,
-    };
-    this.history.push(partialResponse);
-
     let hasToolCall = false;
     let hasFinishReason = false;
     let streamSuccessful = false;

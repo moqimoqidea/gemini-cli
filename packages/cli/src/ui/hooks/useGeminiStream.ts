@@ -66,6 +66,7 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import type { HistoryContent } from '@google/gemini-cli-core/src/common/types.js';
 
 enum StreamProcessingStatus {
   Completed,
@@ -305,6 +306,10 @@ export const useGeminiStream = (
     cancelAllToolCalls(abortControllerRef.current.signal);
 
     if (pendingHistoryItemRef.current) {
+      // Also commit the partial response to the definitive history so it can be saved.
+      geminiClient.commitCancelledResponse(
+        pendingHistoryItemRef.current as unknown as HistoryContent,
+      );
       addItem(pendingHistoryItemRef.current, Date.now());
     }
     setPendingHistoryItem(null);
@@ -334,6 +339,7 @@ export const useGeminiStream = (
     setShellInputFocused,
     cancelAllToolCalls,
     toolCalls,
+    geminiClient,
   ]);
 
   useKeypress(

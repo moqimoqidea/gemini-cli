@@ -30,7 +30,7 @@ export class McpClientManager {
   private readonly toolRegistry: ToolRegistry;
   private readonly cliConfig: Config;
   // If we have ongoing MCP client discovery, this completes once that is done.
-  private discoveryPromise: Promise<unknown> | undefined;
+  private discoveryPromise: Promise<void> | undefined;
   private discoveryState: MCPDiscoveryState = MCPDiscoveryState.NOT_STARTED;
   private readonly eventEmitter?: EventEmitter;
 
@@ -53,23 +53,50 @@ export class McpClientManager {
       );
   }
 
+  /**
+   * For all the MCP servers associated with this extension:
+   *
+   *    - Removes all its MCP servers from the global configuration object.
+   *    - Disconnects all MCP clients from their servers.
+   *    - Updates the Gemini chat configuration to load the new tools.
+   */
   private async unloadExtension(extension: GeminiCLIExtension) {
     debugLogger.log(`Unloading extension: ${extension.name}`);
     await Promise.all(
-      Object.keys(extension.mcpServers ?? {}).map((name) =>
-        this.disconnectClient(name),
-      ),
+      Object.keys(extension.mcpServers ?? {}).map((name) => {
+        const newMcpServers = {
+          ...this.cliConfig.getMcpServers(),
+        };
+        delete newMcpServers[name];
+        this.cliConfig.setMcpServers(newMcpServers);
+        return this.disconnectClient(name);
+      }),
     );
+    // This is required to update the content generator configuration with the
+    // new tool configuration.
     this.cliConfig.getGeminiClient().setTools();
   }
 
+  /**
+   * For all the MCP servers associated with this extension:
+   *
+   *    - Adds all its MCP servers to the global configuration object.
+   *    - Connects MCP clients to each server and discovers their tools.
+   *    - Updates the Gemini chat configuration to load the new tools.
+   */
   private async loadExtension(extension: GeminiCLIExtension) {
     debugLogger.log(`Loading extension: ${extension.name}`);
     await Promise.all(
-      Object.entries(extension.mcpServers ?? {}).map(([name, config]) =>
-        this.discoverMcpTools(name, config),
-      ),
+      Object.entries(extension.mcpServers ?? {}).map(([name, config]) => {
+        this.cliConfig.setMcpServers({
+          ...this.cliConfig.getMcpServers(),
+          [name]: config,
+        });
+        return this.discoverMcpTools(name, config);
+      }),
     );
+    // This is required to update the content generator configuration with the
+    // new tool configuration.
     this.cliConfig.getGeminiClient().setTools();
   }
 
@@ -88,7 +115,10 @@ export class McpClientManager {
     }
   }
 
-  async discoverMcpTools(name: string, config: MCPServerConfig) {
+  discoverMcpTools(
+    name: string,
+    config: MCPServerConfig,
+  ): Promise<void> | void {
     if (!this.cliConfig.isTrustedFolder()) {
       return;
     }
@@ -133,16 +163,17 @@ export class McpClientManager {
     });
 
     if (this.discoveryPromise) {
-      this.discoveryPromise = Promise.all([
-        this.discoveryPromise,
-        currentDiscoveryPromise,
-      ]);
+      this.discoveryPromise = this.discoveryPromise.then(
+        () => currentDiscoveryPromise,
+      );
     } else {
       this.discoveryState = MCPDiscoveryState.IN_PROGRESS;
       this.discoveryPromise = currentDiscoveryPromise;
     }
     const currentPromise = this.discoveryPromise;
     currentPromise.then((_) => {
+      // If we are the last recorded discoveryPromise, then we are done, reset
+      // the world.
       if (currentPromise === this.discoveryPromise) {
         this.discoveryPromise = undefined;
         this.discoveryState = MCPDiscoveryState.COMPLETED;

@@ -209,7 +209,6 @@ export async function handleAtCommand({
     for (const dir of config.getWorkspaceContext().getDirectories()) {
       let resolvedAbsolutePath: string | undefined;
       let resolvedSuccessfully = false;
-      let relativePath = pathName;
       try {
         const absolutePath = path.resolve(dir, pathName);
         await fs.stat(absolutePath);

@@ -265,6 +265,8 @@ describe('Gemini Client (client.ts)', () => {
     client = new GeminiClient(mockConfig);
     await client.initialize();
     vi.mocked(mockConfig.getGeminiClient).mockReturnValue(client);
+
+    vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
   });
 
   afterEach(() => {
@@ -344,6 +346,7 @@ describe('Gemini Client (client.ts)', () => {
       const mockOriginalChat: Partial<GeminiChat> = {
         getHistory: vi.fn((_curated?: boolean) => chatHistory),
         setHistory: vi.fn(),
+        getLastPromptTokenCount: vi.fn().mockReturnValue(originalTokenCount),
       };
       client['chat'] = mockOriginalChat as GeminiChat;
 
@@ -371,6 +374,7 @@ describe('Gemini Client (client.ts)', () => {
       const mockNewChat: Partial<GeminiChat> = {
         getHistory: vi.fn().mockReturnValue(newHistory),
         setHistory: vi.fn(),
+        getLastPromptTokenCount: vi.fn().mockReturnValue(newTokenCount),
       };
 
       client['startChat'] = vi

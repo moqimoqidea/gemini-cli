@@ -770,13 +770,6 @@ export const useGeminiStream = (
           case ServerGeminiEventType.Citation:
             handleCitationEvent(event.value, userMessageTimestamp);
             break;
-          case ServerGeminiEventType.Usage:
-            if (event.value.promptTokenCount !== undefined) {
-              uiTelemetryService.setLastPromptTokenCount(
-                event.value.promptTokenCount,
-              );
-            }
-            break;
           case ServerGeminiEventType.LoopDetected:
             // handle later because we want to move pending history to history
             // before we add loop detected message to history

@@ -2378,43 +2378,6 @@ describe('useGeminiStream', () => {
     });
   });
 
-  describe('Usage Event', () => {
-    it('should update last prompt token count on Usage event', async () => {
-      const promptTokenCount = 123;
-      const responseTokenCount = 456;
-      const totalTokenCount = 579;
-
-      mockSendMessageStream.mockReturnValue(
-        (async function* () {
-          yield {
-            type: ServerGeminiEventType.Usage,
-            value: {
-              promptTokenCount,
-              candidatesTokenCount: responseTokenCount,
-              totalTokenCount,
-            },
-          };
-          yield {
-            type: ServerGeminiEventType.Finished,
-            value: { reason: 'STOP', usageMetadata: undefined },
-          };
-        })(),
-      );
-
-      const { result } = renderTestHook();
-
-      await act(async () => {
-        await result.current.submitQuery('test query');
-      });
-
-      await vi.waitFor(() => {
-        expect(mockSetLastPromptTokenCount).toHaveBeenCalledWith(
-          promptTokenCount,
-        );
-      });
-    });
-  });
-
   describe('ChatCompression Event', () => {
     it('should update last prompt token count and add info message on ChatCompressed event', async () => {
       const newTokenCount = 1234;

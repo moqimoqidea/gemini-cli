@@ -244,17 +244,6 @@ describe('Turn', () => {
 
       expect(events).toEqual([
         {
-          type: 'usage',
-          value: {
-            cachedContentTokenCount: 10,
-            candidatesTokenCount: 50,
-            promptTokenCount: 17,
-            thoughtsTokenCount: 5,
-            toolUsePromptTokenCount: 2,
-            totalTokenCount: 67,
-          },
-        },
-        {
           traceId: undefined,
           type: 'content',
           value: 'Partial response',

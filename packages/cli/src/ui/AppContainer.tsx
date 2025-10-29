@@ -1108,7 +1108,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       historyManager.addItem(
         {
           type,
-          text: payload.message + `\n${payload.error}`,
+          text: payload.message,
         },
         Date.now(),
       );

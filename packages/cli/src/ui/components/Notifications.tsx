@@ -5,24 +5,29 @@
  */
 
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppContext } from '../contexts/AppContext.js';
-import { useSettings } from '../contexts/SettingsContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { theme } from '../semantic-colors.js';
 import { StreamingState } from '../types.js';
 import { UpdateNotification } from './UpdateNotification.js';
-import { SettingScope } from '../../config/settings.js';
 
 import { GEMINI_DIR } from '@google/gemini-cli-core';
-import { homedir } from 'node:os';
+
+import * as fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
-const settingsPath = path.join(homedir(), GEMINI_DIR, 'settings.json');
+const settingsPath = path.join(os.homedir(), GEMINI_DIR, 'settings.json');
+
+const screenReaderNudgeFilePath = path.join(
+  '/tmp',
+  GEMINI_DIR,
+  'hasSeenScreenReaderNudge',
+);
 
 export const Notifications = () => {
   const { startupWarnings } = useAppContext();
-  const loadedSettings = useSettings();
   const { initError, streamingState, updateInfo } = useUIState();
 
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
@@ -30,20 +35,30 @@ export const Notifications = () => {
   const showInitError =
     initError && streamingState !== StreamingState.Responding;
 
-  const hasSeenScreenReaderNudge =
-    loadedSettings.merged.ui?.accessibility?.hasSeenScreenReaderNudge;
+  const [hasSeenScreenReaderNudge, _] = useState(() => {
+    try {
+      fs.accessSync(screenReaderNudgeFilePath);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
   const showScreenReaderNudge =
     isScreenReaderEnabled && !hasSeenScreenReaderNudge;
 
   useEffect(() => {
     if (showScreenReaderNudge) {
-      loadedSettings.setValue(
-        SettingScope.User,
-        'ui.accessibility.hasSeenScreenReaderNudge',
-        true,
-      );
+      try {
+        fs.mkdirSync(path.dirname(screenReaderNudgeFilePath), {
+          recursive: true,
+        });
+        fs.writeFileSync(screenReaderNudgeFilePath, 'true');
+      } catch (_error) {
+        // No-op
+      }
     }
-  }, [showScreenReaderNudge, loadedSettings]);
+  }, [showScreenReaderNudge]);
 
   if (
     !showStartupWarnings &&

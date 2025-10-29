@@ -21,6 +21,7 @@ const mockTerm = {
   onData: vi.fn(() => ({ dispose: vi.fn() })),
   onKey: vi.fn(),
   options: {} as { theme?: Partial<XtermTheme> },
+  dispose: vi.fn(),
 };
 vi.mock('@xterm/xterm', () => ({
   Terminal: vi.fn(() => mockTerm),
@@ -40,7 +41,7 @@ vi.mock('lucide-react', () => ({
 }));
 
 // Mock child components
-vi.mock('./components/SettingsModal', () => {
+vi.mock('./components/Settings/SettingsModal', () => {
   const MockSettingsModal = ({
     isOpen,
     onClose,

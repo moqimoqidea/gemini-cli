@@ -6,6 +6,12 @@
 
 import type { Settings, ThemeDisplay } from '@google/gemini-cli';
 import type { IpcRendererEvent } from 'electron';
+import type {
+  TerminalResizePayload,
+  GeminiEditorResolvePayload,
+  ThemeSetPayload,
+  MainWindowResizePayload,
+} from '../../../shared/types';
 
 export interface GeminiEditorData {
   filePath: string;
@@ -57,21 +63,18 @@ export type IncomingTheme = Partial<CliTheme> & Partial<XtermTheme>;
 
 export interface IElectronAPI {
   onMainWindowResize: (
-    callback: (
-      event: IpcRendererEvent,
-      data: { width: number; height: number },
-    ) => void,
+    callback: (event: IpcRendererEvent, data: MainWindowResizePayload) => void,
   ) => () => void;
   terminal: {
     onData: (
       callback: (event: IpcRendererEvent, data: string) => void,
     ) => () => void;
     sendKey: (key: string) => void;
-    resize: (size: { cols: number; rows: number }) => void;
+    resize: (size: TerminalResizePayload) => void;
     onReset: (callback: (event: IpcRendererEvent) => void) => () => void;
   };
   theme: {
-    set: (theme: 'light' | 'dark') => void;
+    set: (theme: ThemeSetPayload) => void;
     onInit: (
       callback: (event: IpcRendererEvent, theme: IncomingTheme) => void,
     ) => () => void;
@@ -86,6 +89,8 @@ export interface IElectronAPI {
       workspace: Partial<Settings>;
       system: Partial<Settings>;
     }>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    getSchema: () => Promise<any>;
     set: (settings: {
       changes: Partial<Settings>;
       scope?: string;
@@ -99,11 +104,9 @@ export interface IElectronAPI {
   onShowGeminiEditor: (
     callback: (event: IpcRendererEvent, data: GeminiEditorData) => void,
   ) => () => void;
-  resolveDiff: (result: {
-    status: string;
-    content?: string;
-    diffPath: string;
-  }) => Promise<{ success: boolean; error?: string }>;
+  resolveDiff: (
+    result: GeminiEditorResolvePayload,
+  ) => Promise<{ success: boolean; error?: string }>;
 }
 
 declare global {

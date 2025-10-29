@@ -26,14 +26,16 @@
     "@google/gemini-cli": "file:../cli",
     "@google/gemini-cli-core": "file:../core",
     "@monaco-editor/react": "^4.7.0",
+    "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
+    "chokidar": "^4.0.3",
     "electron-store": "^8.2.0",
     "lucide-react": "^0.539.0",
     "monaco-editor": "^0.52.2",
     "node-pty": "^1.1.0-beta34",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "@xterm/addon-fit": "^0.10.0"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.2",
@@ -64,6 +66,10 @@
       "package.json"
     ],
     "extraResources": [
+      {
+        "from": "../../bundle",
+        "to": "bundle"
+      },
       {
         "from": "dist/cli",
         "to": "cli"

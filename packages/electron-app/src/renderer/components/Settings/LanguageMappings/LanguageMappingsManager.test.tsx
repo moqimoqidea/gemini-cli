@@ -7,10 +7,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { LanguageMappingsManager } from './LanguageMappingsManager';
-import * as languageUtils from '../utils/language';
+import * as languageUtils from '../../../utils/language';
 
 // Mock the language utils. This will be hoisted.
-vi.mock('../utils/language', () => ({
+vi.mock('../../../utils/language', () => ({
   getLanguageMap: vi.fn(),
   saveLanguageMap: vi.fn(),
 }));

@@ -8,8 +8,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import * as React from 'react';
 import { GeminiEditor } from './GeminiEditor';
-import * as ThemeContext from '../contexts/ThemeContext';
-import * as languageUtils from '../utils/language';
+import * as ThemeContext from '../../contexts/ThemeContext';
+import * as languageUtils from '../../utils/language';
 
 // Mock dependencies
 vi.mock('@monaco-editor/react', () => ({
@@ -61,8 +61,8 @@ vi.mock('@monaco-editor/react', () => ({
   }),
 }));
 
-vi.mock('../utils/language');
-vi.mock('../contexts/ThemeContext');
+vi.mock('../../utils/language');
+vi.mock('../../contexts/ThemeContext');
 
 interface CustomWindow extends Window {
   monacoChangeCallback: (() => void) | null;

@@ -6,13 +6,16 @@
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type { Settings } from '@google/gemini-cli';
+import type {
+  TerminalResizePayload,
+  GeminiEditorResolvePayload,
+  ThemeSetPayload,
+  MainWindowResizePayload,
+} from '../shared/types';
 
 contextBridge.exposeInMainWorld('electron', {
   onMainWindowResize: (
-    callback: (
-      event: IpcRendererEvent,
-      data: { width: number; height: number },
-    ) => void,
+    callback: (event: IpcRendererEvent, data: MainWindowResizePayload) => void,
   ) => {
     const channel = 'main-window-resize';
     ipcRenderer.on(channel, callback);
@@ -29,7 +32,7 @@ contextBridge.exposeInMainWorld('electron', {
       };
     },
     sendKey: (key: string) => ipcRenderer.send('terminal.keystroke', key),
-    resize: (size: { cols: number; rows: number }) =>
+    resize: (size: TerminalResizePayload) =>
       ipcRenderer.send('terminal.resize', size),
     onReset: (callback: (event: IpcRendererEvent) => void) => {
       const channel = 'terminal.reset';
@@ -40,7 +43,7 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
   theme: {
-    set: (theme: 'light' | 'dark') => ipcRenderer.send('theme:set', theme),
+    set: (theme: ThemeSetPayload) => ipcRenderer.send('theme:set', theme),
     onInit: (
       callback: (
         event: IpcRendererEvent,
@@ -59,9 +62,10 @@ contextBridge.exposeInMainWorld('electron', {
   },
   settings: {
     get: () => ipcRenderer.invoke('settings:get'),
+    getSchema: () => ipcRenderer.invoke('settings:get-schema'),
     set: (settings: { changes: Partial<Settings>; scope?: string }) =>
       ipcRenderer.invoke('settings:set', settings),
-    restartTerminal: () => ipcRenderer.send('settings:restart-terminal'),
+    restartTerminal: () => ipcRenderer.invoke('settings:restart-terminal'),
   },
   languageMap: {
     get: () => ipcRenderer.invoke('language-map:get'),
@@ -71,7 +75,13 @@ contextBridge.exposeInMainWorld('electron', {
   onShowGeminiEditor: (
     callback: (
       event: IpcRendererEvent,
-      data: { filePath: string; oldContent: string; newContent: string },
+      data: {
+        filePath: string;
+        oldContent: string;
+        newContent: string;
+        meta: { filePath: string };
+        diffPath: string;
+      },
     ) => void,
   ) => {
     const channel = 'gemini-editor:show';
@@ -80,9 +90,6 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.removeListener(channel, callback);
     };
   },
-  resolveDiff: (result: {
-    status: string;
-    content?: string;
-    diffPath: string;
-  }) => ipcRenderer.invoke('gemini-editor:resolve', result),
+  resolveDiff: (result: GeminiEditorResolvePayload) =>
+    ipcRenderer.invoke('gemini-editor:resolve', result),
 });

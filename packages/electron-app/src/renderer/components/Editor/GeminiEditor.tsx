@@ -6,8 +6,8 @@
 
 import { DiffEditor, type DiffOnMount } from '@monaco-editor/react';
 import * as React from 'react';
-import { getLanguageForFilePath } from '../utils/language.js';
-import { useTheme } from '../contexts/ThemeContext.js';
+import { getLanguageForFilePath } from '../../utils/language.js';
+import { useTheme } from '../../contexts/ThemeContext.js';
 
 interface GeminiEditorProps {
   open: boolean;

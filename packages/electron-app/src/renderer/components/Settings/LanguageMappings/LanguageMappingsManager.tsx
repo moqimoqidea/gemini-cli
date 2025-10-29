@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { getLanguageMap, saveLanguageMap } from '../utils/language';
+import { getLanguageMap, saveLanguageMap } from '../../../utils/language';
 import './LanguageMappingsManager.css';
 
 export function LanguageMappingsManager() {

@@ -105,7 +105,7 @@ vi.mock('fs', () => ({
 
 // --- Test Suite ---
 
-const wait = () => new Promise((resolve) => setImmediate(resolve));
+const wait = () => new Promise((resolve) => setTimeout(resolve, 300));
 
 describe('main process (index.ts)', () => {
   let app: App;
@@ -200,6 +200,7 @@ describe('main process (index.ts)', () => {
     expect(saveSettings).toHaveBeenCalledWith({
       path: '/fake/path',
       settings: { vimMode: true },
+      originalSettings: { vimMode: true },
     });
     expect(mockWebContents.send).toHaveBeenCalledWith('theme:init', {
       colors: { Background: '#000' },

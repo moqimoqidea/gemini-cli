@@ -568,9 +568,10 @@ export class TestRig {
     if (
       process.env['REGENERATE_MODEL_GOLDENS'] === 'true' &&
       this.fakeResponsesPath &&
-      fs.existsSync(this.fakeResponsesPath)
+      fs.existsSync(this.fakeResponsesPath) &&
+      this.originalFakeResponsesPath
     ) {
-      fs.copyFileSync(this.fakeResponsesPath, this.originalFakeResponsesPath!);
+      fs.copyFileSync(this.fakeResponsesPath, this.originalFakeResponsesPath);
     }
     // Clean up test directory
     if (this.testDir && !env['KEEP_OUTPUT']) {

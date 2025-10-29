@@ -110,21 +110,27 @@ export class FakeContentGenerator implements ContentGenerator {
     M extends FakeResponse['method'],
     R = Extract<FakeResponse, { method: M }>['response'],
   >(method: M, request: unknown): R {
-    let response: FakeResponse | undefined;
+    let keyedResponse: FakeResponse | undefined;
 
     // Try to find a keyed response first
     const key = getRequestString(request);
     if (key !== undefined) {
       const responses = this.keyedResponses.get(key);
       if (responses && responses.length > 0) {
-        response = responses.shift();
+        if (responses.length > 0) {
+          keyedResponse = responses.shift();
+        } else {
+          console.warn(`No more keyed responses for request: ${key}`);
+        }
       }
     }
 
     // Fallback to sequential if no keyed response found
-    if (!response && this.sequentialResponses.length > this.callCounter) {
-      response = this.sequentialResponses[this.callCounter++];
-    }
+    const response =
+      keyedResponse ??
+      (this.sequentialResponses.length > this.callCounter
+        ? this.sequentialResponses[this.callCounter++]
+        : undefined);
 
     if (!response) {
       throw new Error(

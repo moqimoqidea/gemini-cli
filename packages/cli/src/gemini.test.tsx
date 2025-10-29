@@ -23,12 +23,27 @@ import { type LoadedSettings } from './config/settings.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { type Config } from '@google/gemini-cli-core';
 
+let onRenderCallback:
+  | ((renderMetrics: { renderTime: number }) => void)
+  | undefined;
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
     recordSlowRender: vi.fn(),
+  };
+});
+
+vi.mock('ink', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ink')>();
+  return {
+    ...actual,
+    render: vi.fn((_node, options) => {
+      onRenderCallback = options.onRender;
+      return actual.render(_node, options);
+    }),
   };
 });
 
@@ -106,10 +121,6 @@ vi.mock('./utils/relaunch.js', () => ({
 vi.mock('./config/sandboxConfig.js', () => ({
   loadSandboxConfig: vi.fn(),
 }));
-
-let onRenderCallback:
-  | ((renderMetrics: { renderTime: number }) => void)
-  | undefined;
 
 describe('gemini.tsx main function', () => {
   let originalEnvGeminiSandbox: string | undefined;
@@ -458,13 +469,6 @@ describe('startInteractiveUI', () => {
   vi.mock('./utils/cleanup.js', () => ({
     cleanupCheckpoints: vi.fn(() => Promise.resolve()),
     registerCleanup: vi.fn(),
-  }));
-
-  vi.mock('ink', () => ({
-    render: vi.fn((_ui, options) => {
-      onRenderCallback = options?.onRender;
-      return { unmount: vi.fn() };
-    }),
   }));
 
   beforeEach(() => {

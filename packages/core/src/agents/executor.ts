@@ -30,8 +30,8 @@ import {
   WEB_SEARCH_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
-import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
-import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
+import { logAgentFinish, logAgentStart } from '../telemetry/loggers.js';
+import { AgentFinishEvent, AgentStartEvent } from '../telemetry/types.js';
 import type {
   AgentDefinition,
   AgentInputs,
@@ -158,6 +158,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     let turnCounter = 0;
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
     let finalResult: string | null = null;
+    let hasBeenWarnedForStopping = false;
+    let hasBeenWarnedForLimits = false;
 
     logAgentStart(
       this.runtimeContext,
@@ -177,8 +179,17 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         // Check for termination conditions like max turns or timeout.
         const reason = this.checkTermination(startTime, turnCounter);
         if (reason) {
-          terminateReason = reason;
-          break;
+          if (hasBeenWarnedForLimits) {
+            terminateReason = reason;
+            break;
+          }
+          hasBeenWarnedForLimits = true;
+          if (!currentMessage.parts) {
+            currentMessage.parts = [];
+          }
+          currentMessage.parts.push({
+            text: `You are about to exceed the execution limit (${reason}). You must call \`${TASK_COMPLETE_TOOL_NAME}\` on your next turn. Summarize your work if necessary.`,
+          });
         }
         if (signal.aborted) {
           terminateReason = AgentTerminateMode.ABORTED;
@@ -200,13 +211,25 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
         // If the model stops calling tools without calling complete_task, it's an error.
         if (functionCalls.length === 0) {
-          terminateReason = AgentTerminateMode.ERROR;
-          finalResult = `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}' to finalize the session.`;
-          this.emitActivity('ERROR', {
-            error: finalResult,
-            context: 'protocol_violation',
+          if (hasBeenWarnedForStopping) {
+            terminateReason = AgentTerminateMode.ERROR;
+            finalResult = `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}' to finalize the session.`;
+            this.emitActivity('ERROR', {
+              error: finalResult,
+              context: 'protocol_violation',
+            });
+            break;
+          }
+          hasBeenWarnedForStopping = true;
+          if (!currentMessage.parts) {
+            currentMessage.parts = [];
+          }
+          currentMessage.parts.push({
+            text: `You have stopped calling tools. You must either call another tool to continue your work or call \`${TASK_COMPLETE_TOOL_NAME}\` to finish.`,
           });
-          break;
+          continue;
+        } else {
+          hasBeenWarnedForStopping = false;
         }
 
         const { nextMessage, submittedOutput, taskCompleted } =

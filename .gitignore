@@ -57,3 +57,4 @@ patch_output.log
 
 # Local npm configuration
 .npmrc
+.genkit

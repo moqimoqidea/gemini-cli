@@ -21,7 +21,16 @@ import {
 } from './gemini.js';
 import { type LoadedSettings } from './config/settings.js';
 import { appEvents, AppEvent } from './utils/events.js';
-import type { Config } from '@google/gemini-cli-core';
+import { type Config } from '@google/gemini-cli-core';
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    recordSlowRender: vi.fn(),
+  };
+});
 
 // Custom error to identify mock process.exit calls
 class MockProcessExitError extends Error {
@@ -97,6 +106,10 @@ vi.mock('./utils/relaunch.js', () => ({
 vi.mock('./config/sandboxConfig.js', () => ({
   loadSandboxConfig: vi.fn(),
 }));
+
+let onRenderCallback:
+  | ((renderMetrics: { renderTime: number }) => void)
+  | undefined;
 
 describe('gemini.tsx main function', () => {
   let originalEnvGeminiSandbox: string | undefined;
@@ -448,11 +461,18 @@ describe('startInteractiveUI', () => {
   }));
 
   vi.mock('ink', () => ({
-    render: vi.fn().mockReturnValue({ unmount: vi.fn() }),
+    render: vi.fn((_ui, options) => {
+      onRenderCallback = options?.onRender;
+      return { unmount: vi.fn() };
+    }),
   }));
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    onRenderCallback = undefined;
   });
 
   it('should render the UI with proper React context and exitOnCtrlC disabled', async () => {
@@ -507,6 +527,38 @@ describe('startInteractiveUI', () => {
     // We need a small delay to let it execute
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(checkForUpdates).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not recordSlowRender when less than threshold', async () => {
+    const { recordSlowRender } = await import('@google/gemini-cli-core');
+
+    await startInteractiveUI(
+      mockConfig,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      mockInitializationResult,
+    );
+
+    onRenderCallback?.({ renderTime: 200 });
+
+    expect(recordSlowRender).not.toHaveBeenCalled();
+  });
+
+  it('should call recordSlowRender when more than threshold', async () => {
+    const { recordSlowRender } = await import('@google/gemini-cli-core');
+
+    await startInteractiveUI(
+      mockConfig,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      mockInitializationResult,
+    );
+
+    onRenderCallback?.({ renderTime: 300 });
+
+    expect(recordSlowRender).toHaveBeenCalledTimes(1);
   });
 
   it.each([

@@ -307,40 +307,39 @@ export class GeminiChat {
             break;
           } catch (error) {
             lastError = error;
-
-            // The attempt failed. If a partial model response was added for this
-            // attempt, remove it to ensure a clean state for the next retry or
-            // for the final failure state.
-            const lastHistoryEntry = self.history[self.history.length - 1];
-            if (lastHistoryEntry?.role === 'model') {
-              self.history.pop();
-            }
-
             const isContentError = error instanceof InvalidStreamError;
+            const hasMoreAttempts =
+              attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts - 1;
 
-            if (isContentError) {
-              // Check if we have more attempts left.
-              if (attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts - 1) {
-                logContentRetry(
-                  self.config,
-                  new ContentRetryEvent(
-                    attempt,
-                    (error as InvalidStreamError).type,
-                    INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs,
-                    model,
-                  ),
-                );
-                await new Promise((res) =>
-                  setTimeout(
-                    res,
-                    INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs *
-                      (attempt + 1),
-                  ),
-                );
-                continue;
+            if (isContentError && hasMoreAttempts) {
+              // Scenario A: We will retry.
+              // Remove the failed partial placeholder for this attempt.
+              self.history.pop();
+              logContentRetry(
+                self.config,
+                new ContentRetryEvent(
+                  attempt,
+                  (error as InvalidStreamError).type,
+                  INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs,
+                  model,
+                ),
+              );
+              await new Promise((res) =>
+                setTimeout(
+                  res,
+                  INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs * (attempt + 1),
+                ),
+              );
+              continue; // Go to the next attempt.
+            } else {
+              // Scenario B: This is the final failure.
+              if (isContentError) {
+                // All retries exhausted for a retryable error. Clean up history.
+                self.history.pop();
               }
+              // For non-retryable errors, we leave the partial item in the history.
+              break; // Exit the loop to re-throw the error.
             }
-            break;
           }
         }
 
@@ -597,7 +596,14 @@ export class GeminiChat {
           content: responseText,
         });
       }
-      partialResponse.isPartial = !streamSuccessful;
+
+      if (streamSuccessful) {
+        // On success, the turn is complete, so the `isPartial` flag is no longer needed.
+        delete partialResponse.isPartial;
+      } else {
+        // On failure (e.g., stream interruption), explicitly mark the history item as partial.
+        partialResponse.isPartial = true;
+      }
     }
 
     // Stream validation logic: A stream is considered successful if:

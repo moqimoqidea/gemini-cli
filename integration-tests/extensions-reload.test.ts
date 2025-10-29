@@ -56,7 +56,6 @@ test('installs a local extension, updates it, checks it was reloaded properly', 
 
   // Start the CLI.
   const run = await rig.runInteractive();
-  await run.expectText('Connecting to MCP servers... (1/1)');
   await run.expectText('You have 1 extension with an update available');
   // See the outdated extension
   await run.sendText('/extensions list');

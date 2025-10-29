@@ -97,24 +97,3 @@ export const getAllSessionFiles = async (
     throw error;
   }
 };
-
-/**
- * Loads all valid session files from the chats directory and converts them to SessionInfo.
- * Corrupted files are automatically filtered out.
- */
-export const getSessionFiles = async (
-  chatsDir: string,
-  currentSessionId?: string,
-): Promise<SessionInfo[]> => {
-  const allFiles = await getAllSessionFiles(chatsDir, currentSessionId);
-
-  // Filter out corrupted files and extract SessionInfo
-  const validSessions = allFiles
-    .filter(
-      (entry): entry is { fileName: string; sessionInfo: SessionInfo } =>
-        entry.sessionInfo !== null,
-    )
-    .map((entry) => entry.sessionInfo);
-
-  return validSessions;
-};

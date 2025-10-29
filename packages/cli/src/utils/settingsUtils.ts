@@ -39,7 +39,7 @@ function flattenSchema(schema: SettingsSchema, prefix = ''): FlattenedSchema {
 let _FLATTENED_SCHEMA: FlattenedSchema | undefined;
 
 /** Returns a flattened schema, the first call is memoized for future requests. */
-export function getFlattenedSchema() {
+function getFlattenedSchema() {
   return (
     _FLATTENED_SCHEMA ??
     (_FLATTENED_SCHEMA = flattenSchema(getSettingsSchema()))

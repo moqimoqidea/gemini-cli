@@ -12,7 +12,7 @@ import { requestConsentNonInteractive } from '../../config/extensions/consent.js
 import { loadSettings } from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
-export async function handleList() {
+async function handleList() {
   try {
     const workspaceDir = process.cwd();
     const extensionManager = new ExtensionManager({

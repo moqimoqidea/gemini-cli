@@ -9,8 +9,8 @@ import { useEffect, useState } from 'react';
 import { useKeypress } from './useKeypress.js';
 
 // ANSI escape codes to enable/disable terminal focus reporting
-export const ENABLE_FOCUS_REPORTING = '\x1b[?1004h';
-export const DISABLE_FOCUS_REPORTING = '\x1b[?1004l';
+const ENABLE_FOCUS_REPORTING = '\x1b[?1004h';
+const DISABLE_FOCUS_REPORTING = '\x1b[?1004l';
 
 // ANSI escape codes for focus events
 export const FOCUS_IN = '\x1b[I';

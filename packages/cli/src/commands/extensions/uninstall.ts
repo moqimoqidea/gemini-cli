@@ -16,7 +16,7 @@ interface UninstallArgs {
   name: string; // can be extension name or source URL.
 }
 
-export async function handleUninstall(args: UninstallArgs) {
+async function handleUninstall(args: UninstallArgs) {
   try {
     const workspaceDir = process.cwd();
     const extensionManager = new ExtensionManager({

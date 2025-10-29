@@ -20,7 +20,7 @@ interface EnableArgs {
   scope?: string;
 }
 
-export async function handleEnable(args: EnableArgs) {
+async function handleEnable(args: EnableArgs) {
   const workingDir = process.cwd();
   const extensionManager = new ExtensionManager({
     workspaceDir: workingDir,

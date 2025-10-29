@@ -11,7 +11,7 @@ import { settingExistsInScope } from './settingsUtils.js';
 /**
  * Shared scope labels for dialog components that need to display setting scopes
  */
-export const SCOPE_LABELS = {
+const SCOPE_LABELS = {
   [SettingScope.User]: 'User Settings',
   [SettingScope.Workspace]: 'Workspace Settings',
   [SettingScope.System]: 'System Settings',

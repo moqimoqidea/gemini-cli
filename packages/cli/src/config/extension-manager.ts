@@ -667,7 +667,7 @@ function validateName(name: string) {
   }
 }
 
-export function getExtensionId(
+function getExtensionId(
   config: ExtensionConfig,
   installMetadata?: ExtensionInstallMetadata,
 ): string {

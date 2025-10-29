@@ -120,10 +120,7 @@ export async function loadConfig(
   return config;
 }
 
-export function mergeMcpServers(
-  settings: Settings,
-  extensions: GeminiCLIExtension[],
-) {
+function mergeMcpServers(settings: Settings, extensions: GeminiCLIExtension[]) {
   const mcpServers = { ...(settings.mcpServers || {}) };
   for (const extension of extensions) {
     Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {

@@ -17,7 +17,7 @@ interface DisableArgs {
   scope?: string;
 }
 
-export async function handleDisable(args: DisableArgs) {
+async function handleDisable(args: DisableArgs) {
   const workspaceDir = process.cwd();
   const extensionManager = new ExtensionManager({
     workspaceDir,

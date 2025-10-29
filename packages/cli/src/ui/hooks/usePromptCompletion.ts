@@ -15,7 +15,7 @@ import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 
 export const PROMPT_COMPLETION_MIN_LENGTH = 5;
-export const PROMPT_COMPLETION_DEBOUNCE_MS = 250;
+const PROMPT_COMPLETION_DEBOUNCE_MS = 250;
 
 export interface PromptCompletion {
   text: string;

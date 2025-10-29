@@ -46,9 +46,7 @@ import { isSlashCommand } from '../utils/commandUtils.js';
  * rather than potentially sending multiple paste events separated by line
  * breaks which could trigger unintended command execution.
  */
-export function isTerminalPasteTrusted(
-  kittyProtocolSupported: boolean,
-): boolean {
+function isTerminalPasteTrusted(kittyProtocolSupported: boolean): boolean {
   // Ideally we could trust all VSCode family terminals as well but it appears
   // we cannot as Cursor users on windows reported being impacted by this
   // issue (https://github.com/google-gemini/gemini-cli/issues/3763).

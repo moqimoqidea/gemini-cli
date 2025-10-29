@@ -27,10 +27,7 @@ export type VariableContext = {
   [key in keyof typeof VARIABLE_SCHEMA]?: string;
 };
 
-export function validateVariables(
-  variables: VariableContext,
-  schema: VariableSchema,
-) {
+function validateVariables(variables: VariableContext, schema: VariableSchema) {
   for (const key in schema) {
     const definition = schema[key];
     if (definition.required && !variables[key as keyof VariableContext]) {

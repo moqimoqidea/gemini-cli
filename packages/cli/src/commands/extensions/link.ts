@@ -20,7 +20,7 @@ interface InstallArgs {
   path: string;
 }
 
-export async function handleLink(args: InstallArgs) {
+async function handleLink(args: InstallArgs) {
   try {
     const installMetadata: ExtensionInstallMetadata = {
       source: args.path,

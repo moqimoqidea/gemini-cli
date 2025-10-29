@@ -139,7 +139,7 @@ export const WITTY_LOADING_PHRASES = [
   'Releasing the HypnoDrones...',
 ];
 
-export const INFORMATIVE_TIPS = [
+const INFORMATIVE_TIPS = [
   //Settings tips start here
   'Set your preferred editor for opening files (/settings)...',
   'Toggle Vim mode for a modal editing experience (/settings)...',

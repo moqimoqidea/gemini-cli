@@ -35,7 +35,7 @@ const configProxy = new Proxy(mockConfig, {
   },
 });
 
-export const mockSettings = new LoadedSettings(
+const mockSettings = new LoadedSettings(
   { path: '', settings: {}, originalSettings: {} },
   { path: '', settings: {}, originalSettings: {} },
   { path: '', settings: {}, originalSettings: {} },

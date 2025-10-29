@@ -10,8 +10,6 @@ import { getPackageJson } from '../../utils/package.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { debugLogger } from '@google/gemini-cli-core';
 
-export const FETCH_TIMEOUT_MS = 2000;
-
 // Replicating the bits of UpdateInfo we need from update-notifier
 export interface UpdateInfo {
   latest: string;

@@ -17,8 +17,8 @@ import {
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
 
-export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
-export const USER_SETTINGS_DIR = path.join(homedir(), GEMINI_DIR);
+const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
+const USER_SETTINGS_DIR = path.join(homedir(), GEMINI_DIR);
 
 export function getTrustedFoldersPath(): string {
   if (process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH']) {
@@ -168,9 +168,7 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
   return loadedTrustedFolders;
 }
 
-export function saveTrustedFolders(
-  trustedFoldersFile: TrustedFoldersFile,
-): void {
+function saveTrustedFolders(trustedFoldersFile: TrustedFoldersFile): void {
   try {
     // Ensure the directory exists
     const dirPath = path.dirname(trustedFoldersFile.path);
@@ -189,7 +187,7 @@ export function saveTrustedFolders(
 }
 
 /** Is folder trust feature enabled per the current applied settings */
-export function isFolderTrustEnabled(settings: Settings): boolean {
+function isFolderTrustEnabled(settings: Settings): boolean {
   const folderTrustSetting = settings.security?.folderTrust?.enabled ?? false;
   return folderTrustSetting;
 }

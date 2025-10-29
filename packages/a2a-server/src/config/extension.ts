@@ -17,9 +17,10 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { logger } from '../utils/logger.js';
 
-export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
-export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
-export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
+// TODO move these variables from cli/src/config/extensions/variables.ts to core
+const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
+const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
+const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
 
 /**
  * Extension definition as written to disk in gemini-extension.json files.
@@ -134,7 +135,7 @@ function getContextFileNames(config: ExtensionConfig): string[] {
   return config.contextFileName;
 }
 
-export function loadInstallMetadata(
+function loadInstallMetadata(
   extensionDir: string,
 ): ExtensionInstallMetadata | undefined {
   const metadataFilePath = path.join(extensionDir, INSTALL_METADATA_FILENAME);

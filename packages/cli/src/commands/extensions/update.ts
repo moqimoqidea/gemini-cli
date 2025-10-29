@@ -28,7 +28,7 @@ interface UpdateArgs {
 const updateOutput = (info: ExtensionUpdateInfo) =>
   `Extension "${info.name}" successfully updated: ${info.originalVersion} → ${info.updatedVersion}.`;
 
-export async function handleUpdate(args: UpdateArgs) {
+async function handleUpdate(args: UpdateArgs) {
   const workspaceDir = process.cwd();
   const extensionManager = new ExtensionManager({
     workspaceDir,

@@ -42,7 +42,7 @@ function isWordChar(ch: string | undefined): boolean {
 export const isWordCharStrict = (char: string): boolean =>
   /[\w\p{L}\p{N}]/u.test(char); // Matches a single character that is any Unicode letter, any Unicode number, or an underscore
 
-export const isWhitespace = (char: string): boolean => /\s/.test(char);
+const isWhitespace = (char: string): boolean => /\s/.test(char);
 
 // Check if a character is a combining mark (only diacritics for now)
 export const isCombiningMark = (char: string): boolean => /\p{M}/u.test(char);
@@ -52,7 +52,7 @@ export const isWordCharWithCombining = (char: string): boolean =>
   isWordCharStrict(char) || isCombiningMark(char);
 
 // Get the script of a character (simplified for common scripts)
-export const getCharScript = (char: string): string => {
+const getCharScript = (char: string): string => {
   if (/[\p{Script=Latin}]/u.test(char)) return 'latin'; // All Latin script chars including diacritics
   if (/[\p{Script=Han}]/u.test(char)) return 'han'; // Chinese
   if (/[\p{Script=Arabic}]/u.test(char)) return 'arabic';
@@ -63,7 +63,7 @@ export const getCharScript = (char: string): string => {
 };
 
 // Check if two characters are from different scripts (indicating word boundary)
-export const isDifferentScript = (char1: string, char2: string): boolean => {
+const isDifferentScript = (char1: string, char2: string): boolean => {
   if (!isWordCharStrict(char1) || !isWordCharStrict(char2)) return false;
   return getCharScript(char1) !== getCharScript(char2);
 };
@@ -113,10 +113,7 @@ export const findNextWordStartInLine = (
 };
 
 // Find previous word start within a line
-export const findPrevWordStartInLine = (
-  line: string,
-  col: number,
-): number | null => {
+const findPrevWordStartInLine = (line: string, col: number): number | null => {
   const chars = toCodePoints(line);
   let i = col;
 

@@ -51,11 +51,6 @@ export const MODIFIER_ALT_BIT = 2;
 export const MODIFIER_CTRL_BIT = 4;
 
 /**
- * Timing constants for terminal interactions
- */
-export const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
-
-/**
  * VS Code terminal integration constants
  */
 export const VSCODE_SHIFT_ENTER_SEQUENCE = '\\\r\n';
@@ -82,6 +77,3 @@ export const MAX_KITTY_SEQUENCE_LENGTH = 32;
  * Character codes for common escape sequences
  */
 export const CHAR_CODE_ESC = 27;
-export const CHAR_CODE_LEFT_BRACKET = 91;
-export const CHAR_CODE_1 = 49;
-export const CHAR_CODE_2 = 50;

@@ -12,17 +12,16 @@ import { theme } from '../semantic-colors.js';
 import { StreamingState } from '../types.js';
 import { UpdateNotification } from './UpdateNotification.js';
 
-import { GEMINI_DIR } from '@google/gemini-cli-core';
+import { GEMINI_DIR, Storage } from '@google/gemini-cli-core';
 
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
 const settingsPath = path.join(os.homedir(), GEMINI_DIR, 'settings.json');
 
 const screenReaderNudgeFilePath = path.join(
-  '/tmp',
-  GEMINI_DIR,
+  Storage.getGlobalTempDir(),
   'hasSeenScreenReaderNudge',
 );
 
@@ -35,29 +34,38 @@ export const Notifications = () => {
   const showInitError =
     initError && streamingState !== StreamingState.Responding;
 
-  const [hasSeenScreenReaderNudge, _] = useState(() => {
-    try {
-      fs.accessSync(screenReaderNudgeFilePath);
-      return true;
-    } catch {
-      return false;
-    }
-  });
+  const [hasSeenScreenReaderNudge, setHasSeenScreenReaderNudge] =
+    useState(true);
+
+  useEffect(() => {
+    const checkScreenReaderNudge = async () => {
+      try {
+        await fs.access(screenReaderNudgeFilePath);
+        setHasSeenScreenReaderNudge(true);
+      } catch {
+        setHasSeenScreenReaderNudge(false);
+      }
+    };
+    checkScreenReaderNudge();
+  }, []);
 
   const showScreenReaderNudge =
     isScreenReaderEnabled && !hasSeenScreenReaderNudge;
 
   useEffect(() => {
-    if (showScreenReaderNudge) {
-      try {
-        fs.mkdirSync(path.dirname(screenReaderNudgeFilePath), {
-          recursive: true,
-        });
-        fs.writeFileSync(screenReaderNudgeFilePath, 'true');
-      } catch (_error) {
-        // No-op
+    const writeScreenReaderNudgeFile = async () => {
+      if (showScreenReaderNudge) {
+        try {
+          await fs.mkdir(path.dirname(screenReaderNudgeFilePath), {
+            recursive: true,
+          });
+          await fs.writeFile(screenReaderNudgeFilePath, 'true');
+        } catch (error) {
+          console.error('Error storing screen reader nudge', error);
+        }
       }
-    }
+    };
+    writeScreenReaderNudgeFile();
   }, [showScreenReaderNudge]);
 
   if (

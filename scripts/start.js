@@ -69,8 +69,55 @@ if (process.env.DEBUG) {
   // than the relaunched process making it harder to debug.
   env.GEMINI_CLI_NO_RELAUNCH = 'true';
 }
-const child = spawn('node', nodeArgs, { stdio: 'inherit', env });
 
-child.on('close', (code) => {
-  process.exit(code);
-});
+// On Windows, if stdin is not a TTY, we need to use a pseudo-terminal
+// to force interactive mode. This is a workaround for issues with `npm run start`
+// in PowerShell.
+if (process.platform === 'win32' && !process.stdin.isTTY) {
+  (async () => {
+    const { getPty } = await import('../packages/core/dist/utils/getPty.js');
+    const pty = await getPty();
+    if (pty) {
+      const ptyProcess = pty.module.spawn('node', nodeArgs, {
+        cwd: root,
+        env,
+        cols: process.stdout.columns,
+        rows: process.stdout.rows,
+      });
+
+      ptyProcess.onData((data) => {
+        process.stdout.write(data);
+      });
+
+      process.stdin.pipe(ptyProcess);
+
+      ptyProcess.onExit(({ exitCode }) => {
+        process.exit(exitCode);
+      });
+
+      process.stdout.on('resize', () => {
+        if (ptyProcess) {
+          ptyProcess.resize(process.stdout.columns, process.stdout.rows);
+        }
+      });
+      // This is needed to be able to Ctrl+C the process
+      process.on('SIGINT', () => {
+        if (ptyProcess) {
+          ptyProcess.kill('SIGINT');
+        }
+        process.exit(0);
+      });
+    } else {
+      const child = spawn('node', nodeArgs, { stdio: 'inherit', env });
+      child.on('close', (code) => {
+        process.exit(code);
+      });
+    }
+  })();
+} else {
+  const child = spawn('node', nodeArgs, { stdio: 'inherit', env });
+
+  child.on('close', (code) => {
+    process.exit(code);
+  });
+}

@@ -146,6 +146,7 @@ export async function startInteractiveUI(
   startupWarnings: string[],
   workspaceRoot: string = process.cwd(),
   initializationResult: InitializationResult,
+  startupBegin: number,
 ) {
   // When not in screen reader mode, disable line wrapping.
   // We rely on Ink to manage all line wrapping by forcing all content to be
@@ -219,10 +220,15 @@ export async function startInteractiveUI(
       }
     });
 
+  console.log(
+    `Interactive startup time: ${performance.now() - startupBegin}ms`,
+  );
+
   registerCleanup(() => instance.unmount());
 }
 
 export async function main() {
+  const startupBegin = performance.now();
   setupUnhandledRejectionHandler();
   const settings = loadSettings();
   migrateDeprecatedSettings(
@@ -421,10 +427,16 @@ export async function main() {
     }
 
     let input = config.getQuestion();
-    const startupWarnings = [
-      ...(await getStartupWarnings()),
-      ...(await getUserStartupWarnings()),
-    ];
+    const startupWarnings = await (async () => {
+      const start = performance.now();
+      const warnings = [
+        ...(await getStartupWarnings()),
+        ...(await getUserStartupWarnings()),
+      ];
+      const end = performance.now();
+      console.log(`Startup warnings took ${end - start}ms`);
+      return warnings;
+    })();
 
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
@@ -434,6 +446,7 @@ export async function main() {
         startupWarnings,
         process.cwd(),
         initializationResult,
+        startupBegin,
       );
       return;
     }
@@ -473,9 +486,9 @@ export async function main() {
       settings,
     );
 
-    if (config.getDebugMode()) {
-      debugLogger.log('Session ID: %s', sessionId);
-    }
+    console.log(
+      `Non-interactive startup time: ${performance.now() - startupBegin}ms`,
+    );
 
     await runNonInteractive(nonInteractiveConfig, settings, input, prompt_id);
     // Call cleanup before process.exit, which causes cleanup to not run

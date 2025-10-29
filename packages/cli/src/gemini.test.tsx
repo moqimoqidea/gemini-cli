@@ -466,6 +466,7 @@ describe('startInteractiveUI', () => {
       mockStartupWarnings,
       mockWorkspaceRoot,
       mockInitializationResult,
+      0,
     );
 
     // Verify render was called with correct options
@@ -500,6 +501,7 @@ describe('startInteractiveUI', () => {
       mockStartupWarnings,
       mockWorkspaceRoot,
       mockInitializationResult,
+      0,
     );
 
     // Verify all startup tasks were called
@@ -549,6 +551,7 @@ describe('startInteractiveUI', () => {
       mockStartupWarnings,
       mockWorkspaceRoot,
       mockInitializationResult,
+      0,
     );
 
     if (expectedCalls.length > 0) {

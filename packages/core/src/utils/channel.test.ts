@@ -5,56 +5,129 @@
  */
 
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { getReleaseChannel, ReleaseChannel } from './channel.js';
+import { isNightly, isPreview, isStable } from './channel.js';
 import * as packageJson from './package.js';
 
 vi.mock('./package.js', () => ({
   getPackageJson: vi.fn(),
 }));
 
-describe('getReleaseChannel', () => {
+describe('channel', () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
 
-  it('should return STABLE for a stable version', async () => {
-    vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
-      name: 'test',
-      version: '1.0.0',
+  describe('isStable', () => {
+    it('should return true for a stable version', async () => {
+      vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
+        name: 'test',
+        version: '1.0.0',
+      });
+      await expect(isStable('/test/dir')).resolves.toBe(true);
     });
-    const channel = await getReleaseChannel('/test/dir');
-    expect(channel).toBe(ReleaseChannel.STABLE);
+
+    it('should return false for a nightly version', async () => {
+      vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
+        name: 'test',
+        version: '1.0.0-nightly.1',
+      });
+      await expect(isStable('/test/dir')).resolves.toBe(false);
+    });
+
+    it('should return false for a preview version', async () => {
+      vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
+        name: 'test',
+        version: '1.0.0-preview.1',
+      });
+      await expect(isStable('/test/dir')).resolves.toBe(false);
+    });
+
+    it('should return false if package.json is not found', async () => {
+      vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue(undefined);
+      await expect(isStable('/test/dir')).resolves.toBe(false);
+    });
+
+    it('should return false if version is not defined', async () => {
+      vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
+        name: 'test',
+      });
+      await expect(isStable('/test/dir')).resolves.toBe(false);
+    });
   });
 
-  it('should return NIGHTLY for a nightly version', async () => {
-    vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
-      name: 'test',
-      version: '1.0.0-nightly.1',
+  describe('isNightly', () => {
+    it('should return false for a stable version', async () => {
+      vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
+        name: 'test',
+        version: '1.0.0',
+      });
+      await expect(isNightly('/test/dir')).resolves.toBe(false);
     });
-    const channel = await getReleaseChannel('/test/dir');
-    expect(channel).toBe(ReleaseChannel.NIGHTLY);
+
+    it('should return true for a nightly version', async () => {
+      vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
+        name: 'test',
+        version: '1.0.0-nightly.1',
+      });
+      await expect(isNightly('/test/dir')).resolves.toBe(true);
+    });
+
+    it('should return false for a preview version', async () => {
+      vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
+        name: 'test',
+        version: '1.0.0-preview.1',
+      });
+      await expect(isNightly('/test/dir')).resolves.toBe(false);
+    });
+
+    it('should return true if package.json is not found', async () => {
+      vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue(undefined);
+      await expect(isNightly('/test/dir')).resolves.toBe(true);
+    });
+
+    it('should return true if version is not defined', async () => {
+      vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
+        name: 'test',
+      });
+      await expect(isNightly('/test/dir')).resolves.toBe(true);
+    });
   });
 
-  it('should return PREVIEW for a preview version', async () => {
-    vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
-      name: 'test',
-      version: '1.0.0-preview.1',
+  describe('isPreview', () => {
+    it('should return false for a stable version', async () => {
+      vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
+        name: 'test',
+        version: '1.0.0',
+      });
+      await expect(isPreview('/test/dir')).resolves.toBe(false);
     });
-    const channel = await getReleaseChannel('/test/dir');
-    expect(channel).toBe(ReleaseChannel.PREVIEW);
-  });
 
-  it('should return STABLE if package.json is not found', async () => {
-    vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue(undefined);
-    const channel = await getReleaseChannel('/test/dir');
-    expect(channel).toBe(ReleaseChannel.STABLE);
-  });
-
-  it('should return STABLE if version is not defined', async () => {
-    vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
-      name: 'test',
+    it('should return false for a nightly version', async () => {
+      vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
+        name: 'test',
+        version: '1.0.0-nightly.1',
+      });
+      await expect(isPreview('/test/dir')).resolves.toBe(false);
     });
-    const channel = await getReleaseChannel('/test/dir');
-    expect(channel).toBe(ReleaseChannel.STABLE);
+
+    it('should return true for a preview version', async () => {
+      vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
+        name: 'test',
+        version: '1.0.0-preview.1',
+      });
+      await expect(isPreview('/test/dir')).resolves.toBe(true);
+    });
+
+    it('should return false if package.json is not found', async () => {
+      vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue(undefined);
+      await expect(isPreview('/test/dir')).resolves.toBe(false);
+    });
+
+    it('should return false if version is not defined', async () => {
+      vi.spyOn(packageJson, 'getPackageJson').mockResolvedValue({
+        name: 'test',
+      });
+      await expect(isPreview('/test/dir')).resolves.toBe(false);
+    });
   });
 });

@@ -567,7 +567,8 @@ export class TestRig {
   async cleanup() {
     if (
       process.env['REGENERATE_MODEL_GOLDENS'] === 'true' &&
-      this.fakeResponsesPath
+      this.fakeResponsesPath &&
+      fs.existsSync(this.fakeResponsesPath)
     ) {
       fs.copyFileSync(this.fakeResponsesPath, this.originalFakeResponsesPath!);
     }

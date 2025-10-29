@@ -182,7 +182,11 @@ export const AppContainer = (props: AppContainerProps) => {
     extensionsUpdateState,
     extensionsUpdateStateInternal,
     dispatchExtensionStateUpdate,
-  } = useExtensionUpdates(extensionManager, historyManager.addItem);
+  } = useExtensionUpdates(
+    extensionManager,
+    historyManager.addItem,
+    config.getEnableExtensionReloading(),
+  );
 
   const [isPermissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const openPermissionsDialog = useCallback(

@@ -254,6 +254,7 @@ export interface ConfigParameters {
   listExtensions?: boolean;
   extensionLoader?: ExtensionLoader;
   enabledExtensions?: string[];
+  enableExtensionReloading?: boolean;
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
@@ -343,6 +344,7 @@ export class Config {
   private readonly listExtensions: boolean;
   private readonly _extensionLoader: ExtensionLoader;
   private readonly _enabledExtensions: string[];
+  private readonly enableExtensionReloading: boolean;
   private readonly _blockedMcpServers: Array<{
     name: string;
     extensionName: string;
@@ -491,6 +493,7 @@ export class Config {
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
     this.extensionManagement = params.extensionManagement ?? true;
+    this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir);
     this.fakeResponses = params.fakeResponses;
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
@@ -905,6 +908,10 @@ export class Config {
   // the string "none".
   getEnabledExtensions(): string[] {
     return this._enabledExtensions;
+  }
+
+  getEnableExtensionReloading(): boolean {
+    return this.enableExtensionReloading;
   }
 
   getBlockedMcpServers(): Array<{ name: string; extensionName: string }> {

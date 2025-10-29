@@ -42,15 +42,19 @@ export class McpClientManager {
     this.toolRegistry = toolRegistry;
     this.cliConfig = cliConfig;
     this.eventEmitter = eventEmitter;
-    this.cliConfig
-      .getExtensionLoader()
-      .extensionEvents()
-      .on('extensionLoaded', (event) => this.loadExtension(event.extension))
-      .on('extensionEnabled', (event) => this.loadExtension(event.extension))
-      .on('extensionDisabled', (event) => this.unloadExtension(event.extension))
-      .on('extensionUnloaded', (event) =>
-        this.unloadExtension(event.extension),
-      );
+    if (this.cliConfig.getEnableExtensionReloading()) {
+      this.cliConfig
+        .getExtensionLoader()
+        .extensionEvents()
+        .on('extensionLoaded', (event) => this.loadExtension(event.extension))
+        .on('extensionEnabled', (event) => this.loadExtension(event.extension))
+        .on('extensionDisabled', (event) =>
+          this.unloadExtension(event.extension),
+        )
+        .on('extensionUnloaded', (event) =>
+          this.unloadExtension(event.extension),
+        );
+    }
   }
 
   /**

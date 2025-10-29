@@ -28,6 +28,7 @@ export async function updateExtension(
   extensionManager: ExtensionManager,
   currentState: ExtensionUpdateState,
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void,
+  enableExtensionReloading?: boolean,
 ): Promise<ExtensionUpdateInfo | undefined> {
   if (currentState === ExtensionUpdateState.UPDATING) {
     return undefined;
@@ -81,7 +82,9 @@ export async function updateExtension(
       type: 'SET_STATE',
       payload: {
         name: extension.name,
-        state: ExtensionUpdateState.UPDATED_NEEDS_RESTART,
+        state: enableExtensionReloading
+          ? ExtensionUpdateState.UPDATED
+          : ExtensionUpdateState.UPDATED_NEEDS_RESTART,
       },
     });
     return {
@@ -109,6 +112,7 @@ export async function updateAllUpdatableExtensions(
   extensionsState: Map<string, ExtensionUpdateStatus>,
   extensionManager: ExtensionManager,
   dispatch: (action: ExtensionUpdateAction) => void,
+  enableExtensionReloading?: boolean,
 ): Promise<ExtensionUpdateInfo[]> {
   return (
     await Promise.all(
@@ -124,6 +128,7 @@ export async function updateAllUpdatableExtensions(
             extensionManager,
             extensionsState.get(extension.name)!.status,
             dispatch,
+            enableExtensionReloading,
           ),
         ),
     )

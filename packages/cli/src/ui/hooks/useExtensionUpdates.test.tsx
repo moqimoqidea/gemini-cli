@@ -96,7 +96,7 @@ describe('useExtensionUpdates', () => {
     );
 
     function TestComponent() {
-      useExtensionUpdates(extensionManager, addItem);
+      useExtensionUpdates(extensionManager, addItem, false);
       return null;
     }
 
@@ -147,7 +147,7 @@ describe('useExtensionUpdates', () => {
 
     extensionManager.loadExtensions();
     function TestComponent() {
-      useExtensionUpdates(extensionManager, addItem);
+      useExtensionUpdates(extensionManager, addItem, false);
       return null;
     }
 
@@ -225,7 +225,7 @@ describe('useExtensionUpdates', () => {
       });
 
     function TestComponent() {
-      useExtensionUpdates(extensionManager, addItem);
+      useExtensionUpdates(extensionManager, addItem, false);
       return null;
     }
 
@@ -308,7 +308,7 @@ describe('useExtensionUpdates', () => {
     );
 
     function TestComponent() {
-      useExtensionUpdates(extensionManager, addItem);
+      useExtensionUpdates(extensionManager, addItem, false);
       return null;
     }
 

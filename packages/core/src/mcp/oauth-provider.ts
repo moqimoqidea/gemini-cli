@@ -14,6 +14,11 @@ import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { OAuthUtils } from './oauth-utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  DEFAULT_LOOPBACK_HOST,
+  formatLoopbackHostForUri,
+  normalizeLoopbackHost,
+} from '../utils/loopback.js';
 
 export const OAUTH_DISPLAY_MESSAGE_EVENT = 'oauth-display-message' as const;
 
@@ -115,8 +120,7 @@ export class MCPOAuthProvider {
     registrationUrl: string,
     config: MCPOAuthConfig,
   ): Promise<OAuthClientRegistrationResponse> {
-    const redirectUri =
-      config.redirectUri || `http://localhost:${REDIRECT_PORT}${REDIRECT_PATH}`;
+    const redirectUri = this.getRedirectUri(config);
 
     const registrationRequest: OAuthClientRegistrationRequest = {
       client_name: 'Gemini CLI MCP Client',
@@ -188,12 +192,18 @@ export class MCPOAuthProvider {
    */
   private async startCallbackServer(
     expectedState: string,
+    redirectUri: string,
   ): Promise<OAuthAuthorizationResponse> {
     return new Promise((resolve, reject) => {
+      const redirect = new URL(redirectUri);
+      const host = normalizeLoopbackHost(redirect.hostname);
+      const port = redirect.port
+        ? Number.parseInt(redirect.port, 10)
+        : REDIRECT_PORT;
       const server = http.createServer(
         async (req: http.IncomingMessage, res: http.ServerResponse) => {
           try {
-            const url = new URL(req.url!, `http://localhost:${REDIRECT_PORT}`);
+            const url = new URL(req.url!, redirectUri);
 
             if (url.pathname !== REDIRECT_PATH) {
               res.writeHead(404);
@@ -258,9 +268,9 @@ export class MCPOAuthProvider {
       );
 
       server.on('error', reject);
-      server.listen(REDIRECT_PORT, () => {
+      server.listen(port, host, () => {
         debugLogger.log(
-          `OAuth callback server listening on port ${REDIRECT_PORT}`,
+          `OAuth callback server listening on http://${formatLoopbackHostForUri(host)}:${port}`,
         );
       });
 
@@ -288,8 +298,7 @@ export class MCPOAuthProvider {
     pkceParams: PKCEParams,
     mcpServerUrl?: string,
   ): string {
-    const redirectUri =
-      config.redirectUri || `http://localhost:${REDIRECT_PORT}${REDIRECT_PATH}`;
+    const redirectUri = this.getRedirectUri(config);
 
     const params = new URLSearchParams({
       client_id: config.clientId!,
@@ -345,8 +354,7 @@ export class MCPOAuthProvider {
     codeVerifier: string,
     mcpServerUrl?: string,
   ): Promise<OAuthTokenResponse> {
-    const redirectUri =
-      config.redirectUri || `http://localhost:${REDIRECT_PORT}${REDIRECT_PATH}`;
+    const redirectUri = this.getRedirectUri(config);
 
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -452,6 +460,14 @@ export class MCPOAuthProvider {
         scope: scope || undefined,
       } as OAuthTokenResponse;
     }
+  }
+
+  private getRedirectUri(config: MCPOAuthConfig): string {
+    if (config.redirectUri) {
+      return config.redirectUri;
+    }
+    const host = formatLoopbackHostForUri(DEFAULT_LOOPBACK_HOST);
+    return `http://${host}:${REDIRECT_PORT}${REDIRECT_PATH}`;
   }
 
   /**
@@ -744,7 +760,11 @@ ${authUrl}
 ⚠️  Make sure to copy the COMPLETE URL - it may wrap across multiple lines.`);
 
     // Start callback server
-    const callbackPromise = this.startCallbackServer(pkceParams.state);
+    const redirectUri = this.getRedirectUri(config);
+    const callbackPromise = this.startCallbackServer(
+      pkceParams.state,
+      redirectUri,
+    );
 
     // Open browser securely
     try {

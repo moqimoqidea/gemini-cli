@@ -115,7 +115,7 @@ describe('MCPOAuthProvider', () => {
     authorizationUrl: 'https://auth.example.com/authorize',
     tokenUrl: 'https://auth.example.com/token',
     scopes: ['read', 'write'],
-    redirectUri: 'http://localhost:7777/oauth/callback',
+    redirectUri: 'http://127.0.0.1:7777/oauth/callback',
     audiences: ['https://api.example.com'],
   };
 
@@ -183,23 +183,31 @@ describe('MCPOAuthProvider', () => {
         return mockHttpServer as unknown as http.Server;
       });
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        // Simulate OAuth callback
-        setTimeout(() => {
-          const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
-          };
-          const mockRes = {
-            writeHead: vi.fn(),
-            end: vi.fn(),
-          };
-          (callbackHandler as (req: unknown, res: unknown) => void)(
-            mockReq,
-            mockRes,
-          );
-        }, 10);
-      });
+      mockHttpServer.listen.mockImplementation(
+        (port, hostOrCallback, maybeCallback) => {
+          const callback =
+            typeof hostOrCallback === 'function'
+              ? hostOrCallback
+              : maybeCallback;
+          if (typeof callback === 'function') {
+            callback();
+          }
+          // Simulate OAuth callback
+          setTimeout(() => {
+            const mockReq = {
+              url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            };
+            const mockRes = {
+              writeHead: vi.fn(),
+              end: vi.fn(),
+            };
+            (callbackHandler as (req: unknown, res: unknown) => void)(
+              mockReq,
+              mockRes,
+            );
+          }, 10);
+        },
+      );
 
       // Mock token exchange
       mockFetch.mockResolvedValueOnce(
@@ -287,22 +295,31 @@ describe('MCPOAuthProvider', () => {
         return mockHttpServer as unknown as http.Server;
       });
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        setTimeout(() => {
-          const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
-          };
-          const mockRes = {
-            writeHead: vi.fn(),
-            end: vi.fn(),
-          };
-          (callbackHandler as (req: unknown, res: unknown) => void)(
-            mockReq,
-            mockRes,
-          );
-        }, 10);
-      });
+      mockHttpServer.listen.mockImplementation(
+        (port, hostOrCallback, maybeCallback) => {
+          const callback =
+            typeof hostOrCallback === 'function'
+              ? hostOrCallback
+              : maybeCallback;
+          if (typeof callback === 'function') {
+            callback();
+          }
+
+          setTimeout(() => {
+            const mockReq = {
+              url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            };
+            const mockRes = {
+              writeHead: vi.fn(),
+              end: vi.fn(),
+            };
+            (callbackHandler as (req: unknown, res: unknown) => void)(
+              mockReq,
+              mockRes,
+            );
+          }, 10);
+        },
+      );
 
       // Mock token exchange with discovered endpoint
       mockFetch.mockResolvedValueOnce(
@@ -343,7 +360,7 @@ describe('MCPOAuthProvider', () => {
       const mockRegistrationResponse: OAuthClientRegistrationResponse = {
         client_id: 'dynamic_client_id',
         client_secret: 'dynamic_client_secret',
-        redirect_uris: ['http://localhost:7777/oauth/callback'],
+        redirect_uris: ['http://127.0.0.1:7777/oauth/callback'],
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
         token_endpoint_auth_method: 'none',
@@ -365,22 +382,31 @@ describe('MCPOAuthProvider', () => {
         return mockHttpServer as unknown as http.Server;
       });
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        setTimeout(() => {
-          const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
-          };
-          const mockRes = {
-            writeHead: vi.fn(),
-            end: vi.fn(),
-          };
-          (callbackHandler as (req: unknown, res: unknown) => void)(
-            mockReq,
-            mockRes,
-          );
-        }, 10);
-      });
+      mockHttpServer.listen.mockImplementation(
+        (port, hostOrCallback, maybeCallback) => {
+          const callback =
+            typeof hostOrCallback === 'function'
+              ? hostOrCallback
+              : maybeCallback;
+          if (typeof callback === 'function') {
+            callback();
+          }
+
+          setTimeout(() => {
+            const mockReq = {
+              url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            };
+            const mockRes = {
+              writeHead: vi.fn(),
+              end: vi.fn(),
+            };
+            (callbackHandler as (req: unknown, res: unknown) => void)(
+              mockReq,
+              mockRes,
+            );
+          }, 10);
+        },
+      );
 
       // Mock token exchange
       mockFetch.mockResolvedValueOnce(
@@ -415,7 +441,7 @@ describe('MCPOAuthProvider', () => {
       const mockRegistrationResponse: OAuthClientRegistrationResponse = {
         client_id: 'dynamic_client_id',
         client_secret: 'dynamic_client_secret',
-        redirect_uris: ['http://localhost:7777/oauth/callback'],
+        redirect_uris: ['http://127.0.0.1:7777/oauth/callback'],
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
         token_endpoint_auth_method: 'none',
@@ -453,22 +479,31 @@ describe('MCPOAuthProvider', () => {
         return mockHttpServer as unknown as http.Server;
       });
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        setTimeout(() => {
-          const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
-          };
-          const mockRes = {
-            writeHead: vi.fn(),
-            end: vi.fn(),
-          };
-          (callbackHandler as (req: unknown, res: unknown) => void)(
-            mockReq,
-            mockRes,
-          );
-        }, 10);
-      });
+      mockHttpServer.listen.mockImplementation(
+        (port, hostOrCallback, maybeCallback) => {
+          const callback =
+            typeof hostOrCallback === 'function'
+              ? hostOrCallback
+              : maybeCallback;
+          if (typeof callback === 'function') {
+            callback();
+          }
+
+          setTimeout(() => {
+            const mockReq = {
+              url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            };
+            const mockRes = {
+              writeHead: vi.fn(),
+              end: vi.fn(),
+            };
+            (callbackHandler as (req: unknown, res: unknown) => void)(
+              mockReq,
+              mockRes,
+            );
+          }, 10);
+        },
+      );
 
       // Mock token exchange
       mockFetch.mockResolvedValueOnce(
@@ -518,7 +553,7 @@ describe('MCPOAuthProvider', () => {
       const mockRegistrationResponse: OAuthClientRegistrationResponse = {
         client_id: 'dynamic_client_id',
         client_secret: 'dynamic_client_secret',
-        redirect_uris: ['http://localhost:7777/oauth/callback'],
+        redirect_uris: ['http://127.0.0.1:7777/oauth/callback'],
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
         token_endpoint_auth_method: 'none',
@@ -563,22 +598,31 @@ describe('MCPOAuthProvider', () => {
         return mockHttpServer as unknown as http.Server;
       });
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        setTimeout(() => {
-          const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
-          };
-          const mockRes = {
-            writeHead: vi.fn(),
-            end: vi.fn(),
-          };
-          (callbackHandler as (req: unknown, res: unknown) => void)(
-            mockReq,
-            mockRes,
-          );
-        }, 10);
-      });
+      mockHttpServer.listen.mockImplementation(
+        (port, hostOrCallback, maybeCallback) => {
+          const callback =
+            typeof hostOrCallback === 'function'
+              ? hostOrCallback
+              : maybeCallback;
+          if (typeof callback === 'function') {
+            callback();
+          }
+
+          setTimeout(() => {
+            const mockReq = {
+              url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            };
+            const mockRes = {
+              writeHead: vi.fn(),
+              end: vi.fn(),
+            };
+            (callbackHandler as (req: unknown, res: unknown) => void)(
+              mockReq,
+              mockRes,
+            );
+          }, 10);
+        },
+      );
 
       // Mock token exchange
       mockFetch.mockResolvedValueOnce(
@@ -614,22 +658,31 @@ describe('MCPOAuthProvider', () => {
         return mockHttpServer as unknown as http.Server;
       });
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        setTimeout(() => {
-          const mockReq = {
-            url: '/oauth/callback?error=access_denied&error_description=User%20denied%20access',
-          };
-          const mockRes = {
-            writeHead: vi.fn(),
-            end: vi.fn(),
-          };
-          (callbackHandler as (req: unknown, res: unknown) => void)(
-            mockReq,
-            mockRes,
-          );
-        }, 10);
-      });
+      mockHttpServer.listen.mockImplementation(
+        (port, hostOrCallback, maybeCallback) => {
+          const callback =
+            typeof hostOrCallback === 'function'
+              ? hostOrCallback
+              : maybeCallback;
+          if (typeof callback === 'function') {
+            callback();
+          }
+
+          setTimeout(() => {
+            const mockReq = {
+              url: '/oauth/callback?error=access_denied&error_description=User%20denied%20access',
+            };
+            const mockRes = {
+              writeHead: vi.fn(),
+              end: vi.fn(),
+            };
+            (callbackHandler as (req: unknown, res: unknown) => void)(
+              mockReq,
+              mockRes,
+            );
+          }, 10);
+        },
+      );
 
       const authProvider = new MCPOAuthProvider();
       await expect(
@@ -644,22 +697,31 @@ describe('MCPOAuthProvider', () => {
         return mockHttpServer as unknown as http.Server;
       });
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        setTimeout(() => {
-          const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=wrong_state',
-          };
-          const mockRes = {
-            writeHead: vi.fn(),
-            end: vi.fn(),
-          };
-          (callbackHandler as (req: unknown, res: unknown) => void)(
-            mockReq,
-            mockRes,
-          );
-        }, 10);
-      });
+      mockHttpServer.listen.mockImplementation(
+        (port, hostOrCallback, maybeCallback) => {
+          const callback =
+            typeof hostOrCallback === 'function'
+              ? hostOrCallback
+              : maybeCallback;
+          if (typeof callback === 'function') {
+            callback();
+          }
+
+          setTimeout(() => {
+            const mockReq = {
+              url: '/oauth/callback?code=auth_code_123&state=wrong_state',
+            };
+            const mockRes = {
+              writeHead: vi.fn(),
+              end: vi.fn(),
+            };
+            (callbackHandler as (req: unknown, res: unknown) => void)(
+              mockReq,
+              mockRes,
+            );
+          }, 10);
+        },
+      );
 
       const authProvider = new MCPOAuthProvider();
       await expect(
@@ -674,22 +736,31 @@ describe('MCPOAuthProvider', () => {
         return mockHttpServer as unknown as http.Server;
       });
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        setTimeout(() => {
-          const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
-          };
-          const mockRes = {
-            writeHead: vi.fn(),
-            end: vi.fn(),
-          };
-          (callbackHandler as (req: unknown, res: unknown) => void)(
-            mockReq,
-            mockRes,
-          );
-        }, 10);
-      });
+      mockHttpServer.listen.mockImplementation(
+        (port, hostOrCallback, maybeCallback) => {
+          const callback =
+            typeof hostOrCallback === 'function'
+              ? hostOrCallback
+              : maybeCallback;
+          if (typeof callback === 'function') {
+            callback();
+          }
+
+          setTimeout(() => {
+            const mockReq = {
+              url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            };
+            const mockRes = {
+              writeHead: vi.fn(),
+              end: vi.fn(),
+            };
+            (callbackHandler as (req: unknown, res: unknown) => void)(
+              mockReq,
+              mockRes,
+            );
+          }, 10);
+        },
+      );
 
       mockFetch.mockResolvedValueOnce(
         createMockResponse({
@@ -711,10 +782,18 @@ describe('MCPOAuthProvider', () => {
         () => mockHttpServer as unknown as http.Server,
       );
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        // Don't trigger callback - simulate timeout
-      });
+      mockHttpServer.listen.mockImplementation(
+        (port, hostOrCallback, maybeCallback) => {
+          const callback =
+            typeof hostOrCallback === 'function'
+              ? hostOrCallback
+              : maybeCallback;
+          if (typeof callback === 'function') {
+            callback();
+          }
+          // Don't trigger callback - simulate timeout
+        },
+      );
 
       // Mock setTimeout to trigger timeout immediately
       const originalSetTimeout = global.setTimeout;
@@ -982,22 +1061,31 @@ describe('MCPOAuthProvider', () => {
         return mockHttpServer as unknown as http.Server;
       });
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        setTimeout(() => {
-          const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
-          };
-          const mockRes = {
-            writeHead: vi.fn(),
-            end: vi.fn(),
-          };
-          (callbackHandler as (req: unknown, res: unknown) => void)(
-            mockReq,
-            mockRes,
-          );
-        }, 10);
-      });
+      mockHttpServer.listen.mockImplementation(
+        (port, hostOrCallback, maybeCallback) => {
+          const callback =
+            typeof hostOrCallback === 'function'
+              ? hostOrCallback
+              : maybeCallback;
+          if (typeof callback === 'function') {
+            callback();
+          }
+
+          setTimeout(() => {
+            const mockReq = {
+              url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            };
+            const mockRes = {
+              writeHead: vi.fn(),
+              end: vi.fn(),
+            };
+            (callbackHandler as (req: unknown, res: unknown) => void)(
+              mockReq,
+              mockRes,
+            );
+          }, 10);
+        },
+      );
 
       mockFetch.mockResolvedValueOnce(
         createMockResponse({
@@ -1032,22 +1120,31 @@ describe('MCPOAuthProvider', () => {
         return mockHttpServer as unknown as http.Server;
       });
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        setTimeout(() => {
-          const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
-          };
-          const mockRes = {
-            writeHead: vi.fn(),
-            end: vi.fn(),
-          };
-          (callbackHandler as (req: unknown, res: unknown) => void)(
-            mockReq,
-            mockRes,
-          );
-        }, 10);
-      });
+      mockHttpServer.listen.mockImplementation(
+        (port, hostOrCallback, maybeCallback) => {
+          const callback =
+            typeof hostOrCallback === 'function'
+              ? hostOrCallback
+              : maybeCallback;
+          if (typeof callback === 'function') {
+            callback();
+          }
+
+          setTimeout(() => {
+            const mockReq = {
+              url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            };
+            const mockRes = {
+              writeHead: vi.fn(),
+              end: vi.fn(),
+            };
+            (callbackHandler as (req: unknown, res: unknown) => void)(
+              mockReq,
+              mockRes,
+            );
+          }, 10);
+        },
+      );
 
       mockFetch.mockResolvedValueOnce(
         createMockResponse({
@@ -1089,22 +1186,31 @@ describe('MCPOAuthProvider', () => {
         return mockHttpServer as unknown as http.Server;
       });
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        setTimeout(() => {
-          const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
-          };
-          const mockRes = {
-            writeHead: vi.fn(),
-            end: vi.fn(),
-          };
-          (callbackHandler as (req: unknown, res: unknown) => void)(
-            mockReq,
-            mockRes,
-          );
-        }, 10);
-      });
+      mockHttpServer.listen.mockImplementation(
+        (port, hostOrCallback, maybeCallback) => {
+          const callback =
+            typeof hostOrCallback === 'function'
+              ? hostOrCallback
+              : maybeCallback;
+          if (typeof callback === 'function') {
+            callback();
+          }
+
+          setTimeout(() => {
+            const mockReq = {
+              url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            };
+            const mockRes = {
+              writeHead: vi.fn(),
+              end: vi.fn(),
+            };
+            (callbackHandler as (req: unknown, res: unknown) => void)(
+              mockReq,
+              mockRes,
+            );
+          }, 10);
+        },
+      );
 
       mockFetch.mockResolvedValueOnce(
         createMockResponse({
@@ -1143,22 +1249,31 @@ describe('MCPOAuthProvider', () => {
         return mockHttpServer as unknown as http.Server;
       });
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        setTimeout(() => {
-          const mockReq = {
-            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
-          };
-          const mockRes = {
-            writeHead: vi.fn(),
-            end: vi.fn(),
-          };
-          (callbackHandler as (req: unknown, res: unknown) => void)(
-            mockReq,
-            mockRes,
-          );
-        }, 10);
-      });
+      mockHttpServer.listen.mockImplementation(
+        (port, hostOrCallback, maybeCallback) => {
+          const callback =
+            typeof hostOrCallback === 'function'
+              ? hostOrCallback
+              : maybeCallback;
+          if (typeof callback === 'function') {
+            callback();
+          }
+
+          setTimeout(() => {
+            const mockReq = {
+              url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            };
+            const mockRes = {
+              writeHead: vi.fn(),
+              end: vi.fn(),
+            };
+            (callbackHandler as (req: unknown, res: unknown) => void)(
+              mockReq,
+              mockRes,
+            );
+          }, 10);
+        },
+      );
 
       mockFetch.mockResolvedValueOnce(
         createMockResponse({
@@ -1235,19 +1350,28 @@ describe('MCPOAuthProvider', () => {
         return mockHttpServer as unknown as http.Server;
       });
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        setTimeout(() => {
-          const mockReq = {
-            url: '/oauth/callback?code=auth_code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
-          };
-          const mockRes = { writeHead: vi.fn(), end: vi.fn() };
-          (callbackHandler as (req: unknown, res: unknown) => void)(
-            mockReq,
-            mockRes,
-          );
-        }, 10);
-      });
+      mockHttpServer.listen.mockImplementation(
+        (port, hostOrCallback, maybeCallback) => {
+          const callback =
+            typeof hostOrCallback === 'function'
+              ? hostOrCallback
+              : maybeCallback;
+          if (typeof callback === 'function') {
+            callback();
+          }
+
+          setTimeout(() => {
+            const mockReq = {
+              url: '/oauth/callback?code=auth_code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            };
+            const mockRes = { writeHead: vi.fn(), end: vi.fn() };
+            (callbackHandler as (req: unknown, res: unknown) => void)(
+              mockReq,
+              mockRes,
+            );
+          }, 10);
+        },
+      );
 
       // Mock token exchange
       mockFetch.mockResolvedValueOnce(
@@ -1323,19 +1447,28 @@ describe('MCPOAuthProvider', () => {
         return mockHttpServer as unknown as http.Server;
       });
 
-      mockHttpServer.listen.mockImplementation((port, callback) => {
-        callback?.();
-        setTimeout(() => {
-          const mockReq = {
-            url: '/oauth/callback?code=auth_code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
-          };
-          const mockRes = { writeHead: vi.fn(), end: vi.fn() };
-          (callbackHandler as (req: unknown, res: unknown) => void)(
-            mockReq,
-            mockRes,
-          );
-        }, 10);
-      });
+      mockHttpServer.listen.mockImplementation(
+        (port, hostOrCallback, maybeCallback) => {
+          const callback =
+            typeof hostOrCallback === 'function'
+              ? hostOrCallback
+              : maybeCallback;
+          if (typeof callback === 'function') {
+            callback();
+          }
+
+          setTimeout(() => {
+            const mockReq = {
+              url: '/oauth/callback?code=auth_code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+            };
+            const mockRes = { writeHead: vi.fn(), end: vi.fn() };
+            (callbackHandler as (req: unknown, res: unknown) => void)(
+              mockReq,
+              mockRes,
+            );
+          }, 10);
+        },
+      );
 
       // Mock token exchange
       mockFetch.mockResolvedValueOnce(

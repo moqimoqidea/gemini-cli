@@ -423,8 +423,7 @@ export class GeminiClient {
     );
 
     const remainingTokenCount =
-      tokenLimit(modelForLimitCheck) -
-      (this.getChat().getLastPromptTokenCount() ?? 0);
+      tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
 
     if (estimatedRequestTokenCount > remainingTokenCount * 0.95) {
       yield {

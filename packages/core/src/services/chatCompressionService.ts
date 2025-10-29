@@ -101,7 +101,7 @@ export class ChatCompressionService {
       };
     }
 
-    const originalTokenCount = chat.getLastPromptTokenCount() ?? 0;
+    const originalTokenCount = chat.getLastPromptTokenCount();
 
     const contextPercentageThreshold =
       config.getChatCompression()?.contextPercentageThreshold;

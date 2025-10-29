@@ -222,7 +222,7 @@ export class InteractiveRun {
 
   // Simulates typing a string one character at a time to avoid paste detection.
   async sendKeys(text: string) {
-    const delay = 5;
+    const delay = 10;
     for (const char of text) {
       this.ptyProcess.write(char);
       await new Promise((resolve) => setTimeout(resolve, delay));

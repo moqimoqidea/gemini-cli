@@ -49,7 +49,6 @@ import {
 import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
-import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 export function isThinkingSupported(model: string) {
@@ -425,7 +424,7 @@ export class GeminiClient {
 
     const remainingTokenCount =
       tokenLimit(modelForLimitCheck) -
-      uiTelemetryService.getLastPromptTokenCount();
+      (this.getChat().getLastPromptTokenCount() ?? 0);
 
     if (estimatedRequestTokenCount > remainingTokenCount * 0.95) {
       yield {

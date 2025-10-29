@@ -62,6 +62,7 @@ export enum GeminiEventType {
   Retry = 'retry',
   ContextWindowWillOverflow = 'context_window_will_overflow',
   InvalidStream = 'invalid_stream',
+  Usage = 'usage',
 }
 
 export type ServerGeminiRetryEvent = {
@@ -78,6 +79,11 @@ export type ServerGeminiContextWindowWillOverflowEvent = {
 
 export type ServerGeminiInvalidStreamEvent = {
   type: GeminiEventType.InvalidStream;
+};
+
+export type ServerGeminiUsageEvent = {
+  type: GeminiEventType.Usage;
+  value: GenerateContentResponseUsageMetadata;
 };
 
 export interface StructuredError {
@@ -212,7 +218,8 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiUserCancelledEvent
   | ServerGeminiRetryEvent
   | ServerGeminiContextWindowWillOverflowEvent
-  | ServerGeminiInvalidStreamEvent;
+  | ServerGeminiInvalidStreamEvent
+  | ServerGeminiUsageEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
@@ -262,6 +269,13 @@ export class Turn {
         if (!resp) continue; // Skip if there's no response body
 
         this.debugResponses.push(resp);
+
+        if (resp.usageMetadata) {
+          yield {
+            type: GeminiEventType.Usage,
+            value: resp.usageMetadata,
+          };
+        }
 
         const traceId = resp.responseId;
 

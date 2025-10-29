@@ -37,6 +37,7 @@ import {
   tokenLimit,
   debugLogger,
   runInDevTraceSpan,
+  uiTelemetryService,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -767,6 +768,13 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.Citation:
             handleCitationEvent(event.value, userMessageTimestamp);
+            break;
+          case ServerGeminiEventType.Usage:
+            if (event.value.promptTokenCount !== undefined) {
+              uiTelemetryService.setLastPromptTokenCount(
+                event.value.promptTokenCount,
+              );
+            }
             break;
           case ServerGeminiEventType.LoopDetected:
             // handle later because we want to move pending history to history

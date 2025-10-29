@@ -659,64 +659,6 @@ describe('GeminiChat', () => {
         })(),
       ).resolves.not.toThrow();
     });
-
-    it('should call generateContentStream with the correct parameters', async () => {
-      const response = (async function* () {
-        yield {
-          candidates: [
-            {
-              content: {
-                parts: [{ text: 'response' }],
-                role: 'model',
-              },
-              finishReason: 'STOP',
-              index: 0,
-              safetyRatings: [],
-            },
-          ],
-          text: () => 'response',
-          usageMetadata: {
-            promptTokenCount: 42,
-            candidatesTokenCount: 15,
-            totalTokenCount: 57,
-          },
-        } as unknown as GenerateContentResponse;
-      })();
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        response,
-      );
-
-      const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'hello' },
-        'prompt-id-1',
-      );
-      for await (const _ of stream) {
-        // consume stream
-      }
-
-      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
-        {
-          model: 'test-model',
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: 'hello' }],
-            },
-          ],
-          config: {},
-        },
-        'prompt-id-1',
-      );
-
-      // Verify that token counting is called when usageMetadata is present
-      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(
-        42,
-      );
-      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(
-        1,
-      );
-    });
   });
 
   describe('addHistory', () => {

@@ -9,9 +9,9 @@ import { checkForUpdates } from './updateCheck.js';
 import type { LoadedSettings } from '../../config/settings.js';
 
 const getPackageJson = vi.hoisted(() => vi.fn());
-vi.mock('../../utils/package.js', () => ({
-  getPackageJson,
-}));
+vi.mock('@google/gemini-cli-core', () => ({
+    getPackageJson,
+  }));
 
 const latestVersion = vi.hoisted(() => vi.fn());
 vi.mock('latest-version', () => ({

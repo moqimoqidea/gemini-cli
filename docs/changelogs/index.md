@@ -27,12 +27,12 @@ notable changes to Gemini CLI.
   ([gif](https://imgur.com/a/ioRslLd),
   [pr](https://github.com/google-gemini/gemini-cli/pull/10392) by
   [@akhil29](https://github.com/akhil29))
-- **JSON Web Fetch**: Non-HTML content like JSON APIs or raw source code are now
+- **JSON web fetch**: Non-HTML content like JSON APIs or raw source code are now
   properly shown to the model (previously only supported HTML)
   ([gif](https://imgur.com/a/Q58U4qJ),
   [pr](https://github.com/google-gemini/gemini-cli/pull/11284) by
   [@abhipatel12](https://github.com/abhipatel12))
-- **Non-Interactive MCP Commands: **Users can now run MCP slash commands in
+- **Non-interactive MCP commands:** Users can now run MCP slash commands in
   non-interactive mode `gemini "/some-mcp-prompt"`.
   ([pr](https://github.com/google-gemini/gemini-cli/pull/10194) by
   [@capachino](https://github.com/capachino))

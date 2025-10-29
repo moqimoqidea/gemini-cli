@@ -230,6 +230,8 @@ describe('chatCommand', () => {
 
     it('should save history including partial responses', async () => {
       const history: HistoryContent[] = [
+        { role: 'user', parts: [{ text: 'context for our chat' }] },
+        { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] },
         { role: 'user', parts: [{ text: 'Hello' }] },
         {
           role: 'model',

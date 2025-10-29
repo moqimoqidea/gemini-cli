@@ -52,4 +52,11 @@ updatePackageJson('packages/core/package.json', (pkg) => {
   pkg.name = `${scope}/gemini-cli-core`;
 });
 
+// Update @google/gemini-cli
+updatePackageJson('packages/cli/package.json', (pkg) => {
+  pkg.name = `${scope}/gemini-cli`;
+  pkg.dependencies['@google/gemini-cli-core'] =
+    `npm:${scope}/gemini-cli-core@^0.0.0`;
+});
+
 console.log('Successfully prepared packages.');

@@ -306,10 +306,16 @@ export const useGeminiStream = (
     cancelAllToolCalls(abortControllerRef.current.signal);
 
     if (pendingHistoryItemRef.current) {
+      // The pending item is a UI-specific object. It must be transformed
+      // into the standard HistoryContent format before being committed to the
+      // definitive history.
+      const historyItemToCommit: HistoryContent = {
+        role: 'model',
+        parts: [{ text: pendingHistoryItemRef.current.text || '' }],
+      };
+
       // Also commit the partial response to the definitive history so it can be saved.
-      geminiClient.commitCancelledResponse(
-        pendingHistoryItemRef.current as unknown as HistoryContent,
-      );
+      geminiClient.commitCancelledResponse(historyItemToCommit);
       addItem(pendingHistoryItemRef.current, Date.now());
     }
     setPendingHistoryItem(null);

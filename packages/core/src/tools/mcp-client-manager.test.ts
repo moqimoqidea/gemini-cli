@@ -49,6 +49,7 @@ describe('McpClientManager', () => {
         getPromptRegistry: () => {},
         getDebugMode: () => false,
         getWorkspaceContext: () => {},
+        getEnableExtensionReloading: () => false,
       } as unknown as Config,
     );
     await manager.discoverAllMcpTools();
@@ -78,6 +79,7 @@ describe('McpClientManager', () => {
         getPromptRegistry: () => {},
         getDebugMode: () => false,
         getWorkspaceContext: () => {},
+        getEnableExtensionReloading: () => false,
       } as unknown as Config,
     );
     await manager.discoverAllMcpTools();

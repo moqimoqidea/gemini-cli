@@ -71,6 +71,7 @@ const MockedUserPromptEvent = vi.hoisted(() =>
   vi.fn().mockImplementation(() => {}),
 );
 const mockParseAndFormatApiError = vi.hoisted(() => vi.fn());
+const mockSetLastPromptTokenCount = vi.hoisted(() => vi.fn());
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actualCoreModule = (await importOriginal()) as any;
@@ -81,6 +82,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     UserPromptEvent: MockedUserPromptEvent,
     parseAndFormatApiError: mockParseAndFormatApiError,
     tokenLimit: vi.fn().mockReturnValue(100), // Mock tokenLimit
+    uiTelemetryService: {
+      setLastPromptTokenCount: mockSetLastPromptTokenCount,
+    },
   };
 });
 
@@ -160,6 +164,7 @@ describe('useGeminiStream', () => {
 
   beforeEach(() => {
     vi.clearAllMocks(); // Clear mocks before each test
+    mockSetLastPromptTokenCount.mockClear();
 
     mockAddItem = vi.fn();
     // Define the mock for getGeminiClient
@@ -2370,6 +2375,47 @@ describe('useGeminiStream', () => {
           );
         });
       }
+    });
+  });
+
+  describe('ChatCompression Event', () => {
+    it('should update last prompt token count and add info message on ChatCompressed event', async () => {
+      const newTokenCount = 1234;
+      const originalTokenCount = 5678;
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.ChatCompressed,
+            value: {
+              newTokenCount,
+              originalTokenCount,
+            },
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP', usageMetadata: undefined },
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      await vi.waitFor(() => {
+        expect(mockSetLastPromptTokenCount).toHaveBeenCalledWith(newTokenCount);
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'info',
+            text: expect.stringContaining(
+              'IMPORTANT: This conversation approached the input token limit',
+            ),
+          }),
+          expect.any(Number),
+        );
+      });
     });
   });
 

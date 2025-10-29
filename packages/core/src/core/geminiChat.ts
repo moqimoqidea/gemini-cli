@@ -185,7 +185,7 @@ export class GeminiChat {
   // model.
   private sendPromise: Promise<void> = Promise.resolve();
   private readonly chatRecordingService: ChatRecordingService;
-  private lastPromptTokenCount: number | undefined;
+  private lastPromptTokenCount: number;
 
   constructor(
     private readonly config: Config,
@@ -195,6 +195,9 @@ export class GeminiChat {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(config);
     this.chatRecordingService.initialize();
+    this.lastPromptTokenCount = Math.ceil(
+      JSON.stringify(this.history).length / 4,
+    );
   }
 
   setSystemInstruction(sysInstr: string) {
@@ -582,7 +585,7 @@ export class GeminiChat {
     this.history.push({ role: 'model', parts: consolidatedParts });
   }
 
-  getLastPromptTokenCount(): number | undefined {
+  getLastPromptTokenCount(): number {
     return this.lastPromptTokenCount;
   }
 

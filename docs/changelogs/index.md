@@ -5,8 +5,10 @@ notable changes to Gemini CLI.
 
 ## v0.11.0 - Gemini CLI weekly update - 2025-10-20
 
-- 🎉 **Gemini CLI Jules Extension:** Use Gemini CLI to orchestrate Jules.
-  Spawnremote workers, delegate tedious tasks, or check in on running jobs!
+![Gemini CLI and Jules](https://storage.googleapis.com/gweb-developer-goog-blog-assets/images/Jules_Extension_-_Blog_Header_O346JNt.original.png)
+
+- 🎉 **Gemini CLI Jules Extension:** Use Gemini CLI to orchestrate Jules. Spawn
+  remote workers, delegate tedious tasks, or check in on running jobs!
   - Install:
     `gemini extensions install https://github.com/gemini-cli-extensions/jules`
   - Announcement:
@@ -26,8 +28,8 @@ notable changes to Gemini CLI.
   [pr](https://github.com/google-gemini/gemini-cli/pull/10392) by
   [@akhil29](https://github.com/akhil29))
 - **JSON Web Fetch**: Non-HTML content like JSON APIs or raw source code are now
-  properly shown to the model (previously only supported HTML)\*\*
-  \*\*([gif](https://imgur.com/a/Q58U4qJ),
+  properly shown to the model (previously only supported HTML)
+  ([gif](https://imgur.com/a/Q58U4qJ),
   [pr](https://github.com/google-gemini/gemini-cli/pull/11284) by
   [@abhipatel12](https://github.com/abhipatel12))
 - **Non-Interactive MCP Commands: **Users can now run MCP slash commands in

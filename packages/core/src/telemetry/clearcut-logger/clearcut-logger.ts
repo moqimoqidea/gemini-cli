@@ -787,7 +787,7 @@ export class ClearcutLogger {
     if (event.extension_id) {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
-        value: JSON.stringify(event.extension_id),
+        value: event.extension_id,
       });
     }
 

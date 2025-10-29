@@ -310,6 +310,8 @@ ${interactiveMode ? `- Keep the user informed and ask for clarification or confi
 Your core function is efficient and safe assistance. Balance extreme conciseness with the crucial need for clarity, especially regarding safety and potential system modifications. Always prioritize user control and project conventions. Never make assumptions about the contents of files; instead use '${READ_FILE_TOOL_NAME}' or '${READ_MANY_FILES_TOOL_NAME}' to ensure you aren't making broad assumptions. Finally, you are an agent - please keep going until the user's query is completely resolved.
 `.trim();
 
+  console.log('asdf');
+  console.log(basePrompt);
   // if GEMINI_WRITE_SYSTEM_MD is set (and not 0|false), write base system prompt to file
   const writeSystemMdResolution = resolvePathFromEnv(
     process.env['GEMINI_WRITE_SYSTEM_MD'],

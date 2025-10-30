@@ -20,6 +20,12 @@ export {
   themeManager,
   type ThemeDisplay,
 } from './src/ui/themes/theme-manager.js';
+export {
+  getSettingsSchema,
+  type SettingsSchema,
+  type SettingDefinition,
+  type SettingEnumOption,
+} from './src/config/settingsSchema.js';
 
 // --- Global Entry Point ---
 main().catch((error) => {

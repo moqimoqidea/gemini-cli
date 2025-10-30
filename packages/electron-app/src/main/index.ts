@@ -9,14 +9,17 @@ import os from 'node:os';
 import process from 'node:process';
 import { WindowManager } from './managers/window-manager';
 import { registerIpcHandlers } from './ipc/ipc-handlers';
+import log from './utils/logger';
 
 // It's good practice to handle uncaught exceptions, especially in production.
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  dialog.showErrorBox(
-    'An Uncaught Exception Occurred',
-    error.message || 'Unknown error',
-  );
+  log.error('Uncaught Exception:', error);
+  if (!app.isPackaged) {
+    dialog.showErrorBox(
+      'An Uncaught Exception Occurred',
+      error.message || 'Unknown error',
+    );
+  }
   app.quit();
 });
 
@@ -40,6 +43,7 @@ app
   })
   .catch((e) => {
     const error = e as Error;
+    log.error('Error during app startup:', error);
     dialog.showErrorBox(
       'Error during app startup',
       `Message: ${error.message}\nStack: ${error.stack}`,

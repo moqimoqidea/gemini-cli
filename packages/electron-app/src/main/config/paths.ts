@@ -5,19 +5,24 @@
  */
 
 import { app } from 'electron';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { existsSync } from 'node:fs';
 import process from 'node:process';
 
 export const isPackaged = app.isPackaged;
 
 export const ICON_PATH = isPackaged
   ? join(process.resourcesPath, 'resources', 'icon.png')
-  : join(__dirname, '..', '..', 'src', 'resources', 'icon.png');
+  : resolve(__dirname, '../../src/resources/icon.png');
 
 // TODO: Ensure 'bundle' is copied to resources in package.json for production build.
 export const CLI_PATH = isPackaged
   ? join(process.resourcesPath, 'bundle', 'gemini.js')
-  : join(__dirname, '..', '..', '..', '..', 'bundle', 'gemini.js');
+  : resolve(__dirname, '../../../../bundle/gemini.js');
+
+if (!isPackaged && !existsSync(CLI_PATH)) {
+  console.error(`[Config] Development CLI path not found at: ${CLI_PATH}`);
+}
 
 export const PRELOAD_PATH = join(__dirname, '../preload/index.cjs');
 

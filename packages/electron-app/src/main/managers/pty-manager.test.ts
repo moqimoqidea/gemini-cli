@@ -4,11 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { PtyManager } from './pty-manager.js';
 import type { BrowserWindow } from 'electron';
 import * as pty from 'node-pty';
-import chokidar from 'chokidar';
+import { watch, type FSWatcher } from 'chokidar';
 import fs from 'node:fs';
 
 vi.mock('electron', () => ({
@@ -23,9 +31,7 @@ vi.mock('node-pty', () => ({
 }));
 
 vi.mock('chokidar', () => ({
-  default: {
-    watch: vi.fn(),
-  },
+  watch: vi.fn(),
 }));
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -60,7 +66,7 @@ vi.mock('../config/paths', () => ({
 }));
 
 // Mock settings
-vi.mock('@google/gemini-cli/dist/src/config/settings.js', () => ({
+vi.mock('@google/gemini-cli', () => ({
   loadSettings: vi.fn().mockResolvedValue({
     merged: {},
   }),
@@ -68,12 +74,21 @@ vi.mock('@google/gemini-cli/dist/src/config/settings.js', () => ({
 
 describe('PtyManager', () => {
   let ptyManager: PtyManager;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockMainWindow: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockPtyProcess: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockFileWatcher: any;
+  let mockMainWindow: {
+    webContents: { send: Mock };
+    isDestroyed: Mock;
+  };
+  let mockPtyProcess: {
+    onExit: Mock;
+    onData: Mock;
+    kill: Mock;
+    resize: Mock;
+    write: Mock;
+  };
+  let mockFileWatcher: {
+    on: Mock;
+    close: Mock;
+  };
 
   beforeEach(() => {
     mockMainWindow = {
@@ -90,18 +105,15 @@ describe('PtyManager', () => {
       resize: vi.fn(),
       write: vi.fn(),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (pty.spawn as any).mockReturnValue(mockPtyProcess);
+    vi.mocked(pty.spawn).mockReturnValue(mockPtyProcess as unknown as pty.IPty);
 
     mockFileWatcher = {
       on: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (chokidar.watch as any).mockReturnValue(mockFileWatcher);
+    vi.mocked(watch).mockReturnValue(mockFileWatcher as unknown as FSWatcher);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (fs.existsSync as any).mockReturnValue(true);
+    vi.mocked(fs.existsSync).mockReturnValue(true);
 
     ptyManager = new PtyManager(mockMainWindow as unknown as BrowserWindow);
   });
@@ -154,5 +166,21 @@ describe('PtyManager', () => {
     await ptyManager.dispose();
     expect(mockPtyProcess.kill).toHaveBeenCalled();
     expect(mockFileWatcher.close).toHaveBeenCalled();
+  });
+
+  it('should setup file watcher with awaitWriteFinish', async () => {
+    await ptyManager.start();
+    expect(watch).toHaveBeenCalledWith(
+      expect.stringContaining('.gemini/tmp/diff'),
+      expect.objectContaining({
+        ignoreInitial: true,
+        depth: 2,
+        persistent: true,
+        awaitWriteFinish: {
+          stabilityThreshold: 100,
+          pollInterval: 50,
+        },
+      }),
+    );
   });
 });

@@ -12,14 +12,55 @@ import fs from 'node:fs';
 import { join, extname, basename, dirname } from 'node:path';
 import crypto from 'node:crypto';
 import process from 'node:process';
-import chokidar from 'chokidar';
+import { watch, type FSWatcher } from 'chokidar';
 import type { CliSettings } from '../config/types';
 import { CLI_PATH } from '../config/paths';
+import log from '../utils/logger';
+
+async function waitForFileStability(
+  filePath: string,
+  maxRetries = 40,
+  intervalMs = 250,
+  stabilityWindowMs = 500,
+): Promise<void> {
+  let lastMtime = 0;
+  let lastSize = -1;
+  let stableSince = 0;
+  let retries = 0;
+
+  while (retries < maxRetries) {
+    try {
+      const stats = await fs.promises.stat(filePath);
+      if (stats.mtimeMs === lastMtime && stats.size === lastSize) {
+        if (stableSince === 0) {
+          stableSince = Date.now();
+        } else if (Date.now() - stableSince >= stabilityWindowMs) {
+          return; // Stable
+        }
+      } else {
+        lastMtime = stats.mtimeMs;
+        lastSize = stats.size;
+        stableSince = 0;
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+      // If file doesn't exist yet, we keep waiting
+      stableSince = 0;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    retries++;
+  }
+  throw new Error(
+    `Timeout waiting for file stability after ${maxRetries} attempts: ${filePath}`,
+  );
+}
 
 export class PtyManager {
   private ptyProcess: pty.IPty | null = null;
   private onDataDisposable: pty.IDisposable | null = null;
-  private fileWatcher: chokidar.FSWatcher | null = null;
+  private fileWatcher: FSWatcher | null = null;
 
   constructor(private mainWindow: BrowserWindow) {}
 
@@ -37,11 +78,11 @@ export class PtyManager {
     const sessionId = crypto.randomUUID();
     await this.setupFileWatcher();
 
-    console.log(`[PTY] Starting PTY process with CLI path: ${CLI_PATH}`);
+    log.info(`[PTY] Starting PTY process with CLI path: ${CLI_PATH}`);
 
     if (!fs.existsSync(CLI_PATH)) {
       const errorMsg = `[PTY] CLI path not found: ${CLI_PATH}`;
-      console.error(errorMsg);
+      log.error(errorMsg);
       dialog.showErrorBox('Fatal Error', errorMsg);
       return;
     }
@@ -67,7 +108,8 @@ export class PtyManager {
       });
       this.ptyProcess = ptyProcess;
 
-      const outputBuffer: string[] = [];
+      let outputBuffer = '';
+      const MAX_BUFFER_SIZE = 1024 * 1024; // 1MB
       const startTime = Date.now();
 
       ptyProcess.onExit(({ exitCode, signal }) => {
@@ -75,11 +117,11 @@ export class PtyManager {
         if (this.ptyProcess === ptyProcess) {
           this.ptyProcess = null;
         }
-        console.log(
+        log.info(
           `[PTY] Process exited with code ${exitCode} and signal ${signal}`,
         );
 
-        const output = outputBuffer.join('').trim();
+        const output = outputBuffer.trim();
         const baseMessage = `Exit Code: ${exitCode}, Signal: ${signal}`;
         const fullMessage = output
           ? `${baseMessage}\n\nOutput:\n${output}`
@@ -102,14 +144,19 @@ export class PtyManager {
       });
 
       this.onDataDisposable = ptyProcess.onData((data) => {
-        outputBuffer.push(data);
+        outputBuffer += data;
+        if (outputBuffer.length > MAX_BUFFER_SIZE) {
+          outputBuffer = outputBuffer.substring(
+            outputBuffer.length - MAX_BUFFER_SIZE,
+          );
+        }
         if (!this.mainWindow.isDestroyed()) {
           this.mainWindow.webContents.send('terminal.incomingData', data);
         }
       });
     } catch (e) {
       const error = e as Error;
-      console.error(
+      log.error(
         `[PTY] Failed to start PTY process (attempt ${retryCount + 1}):`,
         error,
       );
@@ -131,7 +178,7 @@ export class PtyManager {
       try {
         this.ptyProcess.resize(cols, rows);
       } catch (error) {
-        console.warn('[PTY] Failed to resize PTY:', error);
+        log.warn('[PTY] Failed to resize PTY:', error);
       }
     }
   }
@@ -141,10 +188,10 @@ export class PtyManager {
       try {
         this.ptyProcess.write(data);
       } catch (error) {
-        console.warn('[PTY] Failed to write to PTY:', error);
+        log.warn('[PTY] Failed to write to PTY:', error);
       }
     } else {
-      console.warn('[PTY] Cannot write, ptyProcess is null');
+      log.warn('[PTY] Cannot write, ptyProcess is null');
     }
   }
 
@@ -164,9 +211,7 @@ export class PtyManager {
   }
 
   private async getTerminalCwd() {
-    const { loadSettings } = await import(
-      '@google/gemini-cli/dist/src/config/settings.js'
-    );
+    const { loadSettings } = await import('@google/gemini-cli');
     const { merged } = await loadSettings(os.homedir());
     const settings = merged as CliSettings;
     if (settings.terminalCwd && typeof settings.terminalCwd === 'string') {
@@ -176,9 +221,7 @@ export class PtyManager {
   }
 
   private async getEnv() {
-    const { loadSettings } = await import(
-      '@google/gemini-cli/dist/src/config/settings.js'
-    );
+    const { loadSettings } = await import('@google/gemini-cli');
     const { merged } = await loadSettings(os.homedir());
     const settings = merged as CliSettings;
 
@@ -201,7 +244,7 @@ export class PtyManager {
     try {
       await fs.promises.mkdir(diffDir, { recursive: true });
     } catch (e) {
-      console.error('Error creating diff directory:', e);
+      log.error('Error creating diff directory:', e);
       return;
     }
 
@@ -209,13 +252,17 @@ export class PtyManager {
       await this.fileWatcher.close();
     }
 
-    this.fileWatcher = chokidar.watch(diffDir, {
+    this.fileWatcher = watch(diffDir, {
       ignoreInitial: true,
       depth: 2,
       persistent: true,
+      awaitWriteFinish: {
+        stabilityThreshold: 100,
+        pollInterval: 50,
+      },
     });
 
-    this.fileWatcher.on('add', async (filePath) => {
+    this.fileWatcher.on('add', async (filePath: string) => {
       if (basename(filePath) === 'meta.json') {
         const fullPath = dirname(filePath);
         const responsePath = join(fullPath, 'response.json');
@@ -225,8 +272,7 @@ export class PtyManager {
             return;
           }
 
-          // Give a tiny bit more time for other files to be written
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          // meta.json is stable due to awaitWriteFinish
 
           const meta = JSON.parse(
             await fs.promises.readFile(filePath, 'utf-8'),
@@ -236,8 +282,18 @@ export class PtyManager {
           const oldPath = join(fullPath, `old${fileType}`);
           const newPath = join(fullPath, `new${fileType}`);
 
+          // Wait for old and new files to be stable.
+          // We still need this because they might be written after meta.json,
+          // and we need to ensure they are fully written before reading.
+          // awaitWriteFinish only delays their 'add' events, but we are
+          // processing them here based on meta.json's 'add' event.
+          await Promise.all([
+            waitForFileStability(oldPath),
+            waitForFileStability(newPath),
+          ]);
+
           if (!fs.existsSync(oldPath) || !fs.existsSync(newPath)) {
-            console.warn(`Missing old or new file in ${fullPath}`);
+            log.warn(`Missing old or new file in ${fullPath}`);
             return;
           }
 
@@ -253,7 +309,7 @@ export class PtyManager {
             });
           }
         } catch (e) {
-          console.error('Error processing new diff:', e);
+          log.error('Error processing new diff:', e);
         }
       }
     });

@@ -6,6 +6,7 @@
 
 import type { ErrorInfo, ReactNode } from 'react';
 import { Component } from 'react';
+import './ErrorBoundary.css';
 
 interface Props {
   children?: ReactNode;
@@ -33,28 +34,12 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div
-          style={{
-            padding: '20px',
-            backgroundColor: '#282a36',
-            color: '#ff5555',
-            height: '100vh',
-            fontFamily: 'monospace',
-            overflow: 'auto',
-          }}
-        >
+        <div className="error-boundary-container">
           <h1>Something went wrong.</h1>
           <pre>{this.state.error?.toString()}</pre>
           <button
             onClick={() => window.location.reload()}
-            style={{
-              marginTop: '20px',
-              padding: '10px 20px',
-              backgroundColor: '#44475a',
-              color: '#f8f8f2',
-              border: 'none',
-              cursor: 'pointer',
-            }}
+            className="error-boundary-button"
           >
             Reload Application
           </button>

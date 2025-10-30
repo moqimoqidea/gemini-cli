@@ -7,13 +7,23 @@
 import { app, BrowserWindow, dialog } from 'electron';
 import os from 'node:os';
 import process from 'node:process';
+import Store from 'electron-store';
 import { PtyManager } from './pty-manager';
 import type { CliSettings } from '../config/types';
 import { ICON_PATH, PRELOAD_PATH, RENDERER_INDEX_PATH } from '../config/paths';
 
+interface WindowBounds {
+  width: number;
+  height: number;
+  x?: number;
+  y?: number;
+}
+
 export class WindowManager {
   private mainWindow: BrowserWindow | null = null;
   private ptyManager: PtyManager | null = null;
+  private store = new Store();
+  private saveBoundsTimeout: NodeJS.Timeout | null = null;
 
   constructor() {}
 
@@ -25,14 +35,16 @@ export class WindowManager {
 
     try {
       const cliTheme = await this.getThemeFromSettings();
-
-      this.mainWindow = new BrowserWindow({
+      const bounds = this.store.get('windowBounds', {
         width: 900,
         height: 600,
+      }) as WindowBounds;
+
+      this.mainWindow = new BrowserWindow({
+        ...bounds,
         title: 'Gemini CLI',
         icon: ICON_PATH,
         titleBarStyle: 'hidden',
-        trafficLightPosition: { x: 15, y: 10 },
         backgroundColor: cliTheme ? cliTheme.colors.Background : '#282a36',
         webPreferences: {
           preload: PRELOAD_PATH,
@@ -56,13 +68,12 @@ export class WindowManager {
       });
 
       this.mainWindow.on('resize', () => {
-        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-          const [width, height] = this.mainWindow.getContentSize();
-          this.mainWindow.webContents.send('main-window-resize', {
-            width,
-            height,
-          });
-        }
+        this.handleResize();
+        this.saveBounds();
+      });
+
+      this.mainWindow.on('move', () => {
+        this.saveBounds();
       });
 
       this.mainWindow.webContents.on('did-finish-load', () => {
@@ -93,12 +104,7 @@ export class WindowManager {
   }
 
   async getThemeFromSettings() {
-    const { loadSettings } = await import(
-      '@google/gemini-cli/dist/src/config/settings.js'
-    );
-    const { themeManager } = await import(
-      '@google/gemini-cli/dist/src/ui/themes/theme-manager.js'
-    );
+    const { loadSettings, themeManager } = await import('@google/gemini-cli');
     const { merged } = await loadSettings(os.homedir());
     const settings = merged as CliSettings;
     const themeName = settings.theme;
@@ -108,5 +114,26 @@ export class WindowManager {
 
     themeManager.loadCustomThemes(settings.customThemes);
     return themeManager.getTheme(themeName);
+  }
+
+  private handleResize() {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      const [width, height] = this.mainWindow.getContentSize();
+      this.mainWindow.webContents.send('main-window-resize', {
+        width,
+        height,
+      });
+    }
+  }
+
+  private saveBounds() {
+    if (this.saveBoundsTimeout) {
+      clearTimeout(this.saveBoundsTimeout);
+    }
+    this.saveBoundsTimeout = setTimeout(() => {
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.store.set('windowBounds', this.mainWindow.getBounds());
+      }
+    }, 500);
   }
 }

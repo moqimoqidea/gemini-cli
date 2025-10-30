@@ -84,6 +84,7 @@ const mockElectronApi = {
   },
   settings: {
     get: vi.fn().mockResolvedValue({ merged: {} }),
+    getSchema: vi.fn().mockResolvedValue({}),
     set: vi.fn(),
     restartTerminal: vi.fn(),
   },

@@ -6,12 +6,16 @@
 
 import type React from 'react';
 import { createContext, useContext, useState, useEffect } from 'react';
+import type { Settings, SettingsSchema } from '@google/gemini-cli';
 
 interface SettingsContextType {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  settings: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  schema: any;
+  settings: {
+    merged: Partial<Settings>;
+    user: Partial<Settings>;
+    workspace: Partial<Settings>;
+    system: Partial<Settings>;
+  } | null;
+  schema: SettingsSchema | null;
   loading: boolean;
   refreshSettings: () => Promise<void>;
 }
@@ -27,10 +31,9 @@ export function useSettings() {
 }
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [settings, setSettings] = useState<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [schema, setSchema] = useState<any>(null);
+  const [settings, setSettings] =
+    useState<SettingsContextType['settings']>(null);
+  const [schema, setSchema] = useState<SettingsSchema | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refreshSettings = async () => {

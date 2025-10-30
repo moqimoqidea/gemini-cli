@@ -79,3 +79,13 @@
 .mcp-server-form .form-actions button:hover {
   background-color: #005a9e;
 }
+
+.mcp-server-form .form-item .input-error {
+  border-color: #f48771;
+}
+
+.mcp-server-form .error-message {
+  color: #f48771;
+  font-size: 12px;
+  margin-top: 5px;
+}

@@ -6,7 +6,12 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import './SettingsModal.css';
-import type { Settings, ThemeDisplay } from '@google/gemini-cli';
+import type {
+  Settings,
+  ThemeDisplay,
+  SettingsSchema,
+  SettingDefinition,
+} from '@google/gemini-cli';
 import { McpServerManager } from './McpServer/McpServerManager';
 import { LanguageMappingsManager } from './LanguageMappings/LanguageMappingsManager';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -22,10 +27,13 @@ const get = (
   path: string,
   defaultValue: unknown,
 ) => {
-  if (!obj) return defaultValue;
+  if (!obj || typeof obj !== 'object') return defaultValue;
   const keys = path.split('.');
   let result = obj;
   for (const key of keys) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      return defaultValue;
+    }
     if (result === undefined || result === null || typeof result !== 'object') {
       return defaultValue;
     }
@@ -42,24 +50,32 @@ const set = (obj: Record<string, unknown>, path: string, value: unknown) => {
   const keys = path.split('.');
   let current = obj;
   for (let i = 0; i < keys.length - 1; i++) {
-    current[keys[i]] = current[keys[i]] || {};
-    current = current[keys[i]] as Record<string, unknown>;
+    const key = keys[i];
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      return;
+    }
+    current[key] = current[key] || {};
+    current = current[key] as Record<string, unknown>;
   }
-  current[keys[keys.length - 1]] = value;
+  const lastKey = keys[keys.length - 1];
+  if (
+    lastKey === '__proto__' ||
+    lastKey === 'constructor' ||
+    lastKey === 'prototype'
+  ) {
+    return;
+  }
+  current[lastKey] = value;
 };
 
-interface FlattenedSetting {
+interface FlattenedSetting extends SettingDefinition {
   key: string;
-  type: string;
-  label: string;
-  description?: string;
-  category: string;
-  options?: Array<{ value: string | number; label: string }>;
-  showInDialog?: boolean;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function flattenSchema(schema: any, parentPath = ''): FlattenedSetting[] {
+function flattenSchema(
+  schema: SettingsSchema,
+  parentPath = '',
+): FlattenedSetting[] {
   let result: FlattenedSetting[] = [];
   for (const key in schema) {
     const setting = schema[key];
@@ -67,14 +83,8 @@ function flattenSchema(schema: any, parentPath = ''): FlattenedSetting[] {
 
     if (setting.showInDialog) {
       result.push({
+        ...setting,
         key: path,
-        type: setting.type,
-        label: setting.label,
-        description: setting.description,
-        category: setting.category || 'Other',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        options: setting.options as any,
-        showInDialog: setting.showInDialog,
       });
     }
 

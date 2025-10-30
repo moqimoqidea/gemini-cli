@@ -14,14 +14,18 @@ import type { Theme } from '../contexts/ThemeContext';
 function debounce<T extends (...args: unknown[]) => void>(
   func: T,
   timeout = 100,
-): (...args: Parameters<T>) => void {
+) {
   let timer: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
+  const debounced = (...args: Parameters<T>) => {
     clearTimeout(timer);
     timer = setTimeout(() => {
       func(...args);
     }, timeout);
   };
+  debounced.cancel = () => {
+    clearTimeout(timer);
+  };
+  return debounced;
 }
 
 export function useTerminal(
@@ -96,6 +100,7 @@ export function useTerminal(
         window.electron.onMainWindowResize(onResize);
 
       return () => {
+        debouncedResize.cancel();
         resizeObserver.disconnect();
         window.removeEventListener('focus', onResize);
         removeResetListener();

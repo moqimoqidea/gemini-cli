@@ -10,6 +10,8 @@ import { SettingsModal } from './components/Settings/SettingsModal';
 import { GeminiEditor } from './components/Editor/GeminiEditor';
 import { Terminal, type TerminalRef } from './components/Terminal/Terminal';
 import { ThemeContext } from './contexts/ThemeContext';
+import { isCliTheme } from './utils/theme';
+import './App.css';
 
 interface GeminiEditorState {
   open: boolean;
@@ -75,11 +77,9 @@ function App() {
     const removeListener = window.electron.theme.onInit(
       (_event, receivedTheme) => {
         console.log('Received theme from main process:', receivedTheme);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ((receivedTheme as any).colors) {
+        if (isCliTheme(receivedTheme)) {
           // It's a CLI theme object, convert it to an xterm.js theme object
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const colors = (receivedTheme as any).colors;
+          const colors = receivedTheme.colors;
           const xtermTheme = {
             background: colors.Background,
             foreground: colors.Foreground,
@@ -114,60 +114,21 @@ function App() {
     };
   }, []);
 
+  const themeStyles = {
+    '--bg-color': cliTheme.background,
+    '--fg-color': cliTheme.foreground,
+    '--border-color': cliTheme.selectionBackground || '#44475a',
+  } as React.CSSProperties;
+
   return (
     <ThemeContext.Provider value={cliTheme}>
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          width: '100%',
-          position: 'fixed',
-          backgroundColor: cliTheme.background,
-        }}
-      >
-        <div
-          style={
-            {
-              height: '30px',
-              backgroundColor: cliTheme.background,
-              color: cliTheme.foreground,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 'bold',
-              fontSize: '12px',
-              WebkitAppRegion: 'drag',
-              flexShrink: 0,
-              position: 'relative',
-              userSelect: 'none',
-              borderBottom: `1px solid ${
-                cliTheme.selectionBackground || '#44475a'
-              }`,
-            } as React.CSSProperties
-          }
-        >
-          <span style={{ flex: 1, textAlign: 'center' }}>Gemini CLI</span>
-          <div
-            style={
-              {
-                position: 'absolute',
-                right: '10px',
-                top: '5px',
-                display: 'flex',
-                gap: '10px',
-                WebkitAppRegion: 'no-drag',
-              } as React.CSSProperties
-            }
-          >
+      <div className="app-container" style={themeStyles}>
+        <div className="title-bar">
+          <span className="title-bar-text">Gemini CLI</span>
+          <div className="title-bar-controls">
             <button
               onClick={() => setIsSettingsOpen(true)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'inherit',
-              }}
+              className="icon-button"
             >
               <Settings size={16} />
             </button>

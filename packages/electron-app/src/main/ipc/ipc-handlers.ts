@@ -9,13 +9,19 @@ import { z } from 'zod';
 import Store from 'electron-store';
 import os from 'node:os';
 import fs from 'node:fs';
-import { join, extname } from 'node:path';
+import { join, extname, resolve, sep } from 'node:path';
 import type { WindowManager } from '../managers/window-manager';
 import type { CliSettings } from '../config/types';
 import { deepMerge } from '../utils/utils';
-import type { Settings } from '@google/gemini-cli/dist/src/config/settings.js';
+import type {
+  Settings,
+  SettingsSchema,
+  SettingDefinition,
+  SettingEnumOption,
+} from '@google/gemini-cli';
 
 const store = new Store();
+const DIFF_ROOT = join(os.homedir(), '.gemini', 'tmp', 'diff');
 
 // Validation Schemas
 const resizeSchema = z.object({
@@ -37,6 +43,106 @@ const settingsSetSchema = z.object({
 const themeSetSchema = z.enum(['light', 'dark']);
 
 const languageMapSetSchema = z.record(z.string());
+
+// Helper functions for settings validation
+function validateSettingValue(
+  value: unknown,
+  definition: SettingDefinition,
+  path: string,
+) {
+  if (value === undefined || value === null) {
+    return;
+  }
+
+  switch (definition.type) {
+    case 'string':
+      if (typeof value !== 'string') {
+        throw new Error(
+          `Invalid type for ${path}: expected string, got ${typeof value}`,
+        );
+      }
+      break;
+    case 'boolean':
+      if (typeof value !== 'boolean') {
+        throw new Error(
+          `Invalid type for ${path}: expected boolean, got ${typeof value}`,
+        );
+      }
+      break;
+    case 'number':
+      if (typeof value !== 'number') {
+        throw new Error(
+          `Invalid type for ${path}: expected number, got ${typeof value}`,
+        );
+      }
+      break;
+    case 'enum':
+      if (definition.options) {
+        const validValues = definition.options.map(
+          (o: SettingEnumOption) => o.value,
+        );
+        if (
+          typeof value !== 'string' &&
+          typeof value !== 'number' &&
+          typeof value !== 'boolean'
+        ) {
+          throw new Error(
+            `Invalid type for ${path}: expected string, number, or boolean, got ${typeof value}`,
+          );
+        }
+        // We cast value to string | number | boolean to match validValues types roughly,
+        // though SettingEnumOption.value is string | number.
+        // Actually validValues is (string | number)[].
+        if (!validValues.includes(value as string | number)) {
+          throw new Error(
+            `Invalid value for ${path}: expected one of [${validValues.join(', ')}], got ${value}`,
+          );
+        }
+      }
+      break;
+    case 'array':
+      if (!Array.isArray(value)) {
+        throw new Error(
+          `Invalid type for ${path}: expected array, got ${typeof value}`,
+        );
+      }
+      break;
+    case 'object':
+      if (typeof value !== 'object' || Array.isArray(value)) {
+        throw new Error(
+          `Invalid type for ${path}: expected object, got ${typeof value}`,
+        );
+      }
+      if (definition.properties) {
+        const objValue = value as Record<string, unknown>;
+        for (const key in objValue) {
+          if (definition.properties[key]) {
+            validateSettingValue(
+              objValue[key],
+              definition.properties[key],
+              `${path}.${key}`,
+            );
+          }
+        }
+      }
+      break;
+    default:
+      // Handle other types or unknown types if necessary, or do nothing if they don't need validation.
+      break;
+  }
+}
+
+function validateSettings(settings: unknown, schema: SettingsSchema) {
+  if (typeof settings !== 'object' || settings === null) {
+    throw new Error('Settings must be an object');
+  }
+  const settingsObj = settings as Record<string, unknown>;
+  for (const key in settingsObj) {
+    if (schema[key]) {
+      validateSettingValue(settingsObj[key], schema[key], key);
+    }
+  }
+}
 
 export function registerIpcHandlers(windowManager: WindowManager) {
   let prevResize = [0, 0];
@@ -86,11 +192,24 @@ export function registerIpcHandlers(windowManager: WindowManager) {
     const { diffPath, status, content } = parseResult.data;
 
     try {
-      const metaPath = join(diffPath, 'meta.json');
+      // Security check for path traversal
+      const normalizedDiffPath = resolve(diffPath);
+      if (
+        normalizedDiffPath !== DIFF_ROOT &&
+        !normalizedDiffPath.startsWith(DIFF_ROOT + sep)
+      ) {
+        console.error(
+          '[Security] Attempted path traversal in diff resolve:',
+          diffPath,
+        );
+        return { success: false, error: 'Invalid diff path' };
+      }
+
+      const metaPath = join(normalizedDiffPath, 'meta.json');
       const meta = JSON.parse(await fs.promises.readFile(metaPath, 'utf-8'));
       const fileType = extname(meta.filePath);
-      const newFilePath = join(diffPath, `new${fileType}`);
-      const responsePath = join(diffPath, 'response.json');
+      const newFilePath = join(normalizedDiffPath, `new${fileType}`);
+      const responsePath = join(normalizedDiffPath, 'response.json');
 
       if (status === 'approve') {
         await fs.promises.writeFile(newFilePath, content || '');
@@ -104,9 +223,7 @@ export function registerIpcHandlers(windowManager: WindowManager) {
   });
 
   ipcMain.handle('settings:get', async () => {
-    const { loadSettings } = await import(
-      '@google/gemini-cli/dist/src/config/settings.js'
-    );
+    const { loadSettings } = await import('@google/gemini-cli');
     const settings = await loadSettings(os.homedir());
     const merged = settings.merged as CliSettings;
 
@@ -126,19 +243,8 @@ export function registerIpcHandlers(windowManager: WindowManager) {
 
   ipcMain.handle('settings:get-schema', async () => {
     try {
-      const mod = await import(
-        '@google/gemini-cli/dist/src/config/settingsSchema.js'
-      );
-      if (mod.getSettingsSchema) {
-        return mod.getSettingsSchema();
-      }
-      // Fallback if it was exported directly
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((mod as any).SETTINGS_SCHEMA) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return (mod as any).SETTINGS_SCHEMA;
-      }
-      throw new Error('Schema not found in module');
+      const { getSettingsSchema } = await import('@google/gemini-cli');
+      return getSettingsSchema();
     } catch (error) {
       console.error('[IPC] Failed to load settings schema:', error);
       throw error;
@@ -146,12 +252,7 @@ export function registerIpcHandlers(windowManager: WindowManager) {
   });
 
   ipcMain.handle('themes:get', async () => {
-    const { loadSettings } = await import(
-      '@google/gemini-cli/dist/src/config/settings.js'
-    );
-    const { themeManager } = await import(
-      '@google/gemini-cli/dist/src/ui/themes/theme-manager.js'
-    );
+    const { loadSettings, themeManager } = await import('@google/gemini-cli');
     const { merged } = await loadSettings(os.homedir());
     const settings = merged as CliSettings;
     themeManager.loadCustomThemes(settings.customThemes);
@@ -165,9 +266,8 @@ export function registerIpcHandlers(windowManager: WindowManager) {
     }
     const { changes, scope = 'User' } = parseResult.data;
 
-    const { loadSettings, saveSettings, SettingScope } = await import(
-      '@google/gemini-cli/dist/src/config/settings.js'
-    );
+    const { loadSettings, saveSettings, SettingScope, getSettingsSchema } =
+      await import('@google/gemini-cli');
     try {
       const loadedSettings = await loadSettings(os.homedir());
 
@@ -196,6 +296,10 @@ export function registerIpcHandlers(windowManager: WindowManager) {
       }
 
       const mergedSettings = deepMerge(newSettings, typedChanges);
+
+      // Validate settings before saving
+      const schema = getSettingsSchema();
+      validateSettings(mergedSettings, schema);
 
       saveSettings({
         path: settingsFile.path,

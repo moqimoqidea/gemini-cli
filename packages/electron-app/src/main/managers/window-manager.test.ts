@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { WindowManager } from './window-manager.js';
 import { BrowserWindow } from 'electron';
 import { PtyManager } from './pty-manager.js';
@@ -30,13 +38,10 @@ vi.mock('../config/paths', () => ({
 }));
 
 // Mock settings
-vi.mock('@google/gemini-cli/dist/src/config/settings.js', () => ({
+vi.mock('@google/gemini-cli', () => ({
   loadSettings: vi.fn().mockResolvedValue({
     merged: {},
   }),
-}));
-
-vi.mock('@google/gemini-cli/dist/src/ui/themes/theme-manager.js', () => ({
   themeManager: {
     loadCustomThemes: vi.fn(),
     getTheme: vi.fn(),
@@ -53,10 +58,23 @@ vi.mock('node:os', async (importOriginal) => {
 
 describe('WindowManager', () => {
   let windowManager: WindowManager;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockBrowserWindow: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockPtyManager: any;
+  let mockBrowserWindow: {
+    on: Mock;
+    loadFile: Mock;
+    loadURL: Mock;
+    webContents: {
+      on: Mock;
+      send: Mock;
+    };
+    isDestroyed: Mock;
+    focus: Mock;
+    getContentSize: Mock;
+    getBounds: Mock;
+  };
+  let mockPtyManager: {
+    start: Mock;
+    dispose: Mock;
+  };
 
   beforeEach(() => {
     mockBrowserWindow = {
@@ -70,16 +88,19 @@ describe('WindowManager', () => {
       isDestroyed: vi.fn().mockReturnValue(false),
       focus: vi.fn(),
       getContentSize: vi.fn().mockReturnValue([800, 600]),
+      getBounds: vi.fn().mockReturnValue({ width: 800, height: 600 }),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (BrowserWindow as any).mockImplementation(() => mockBrowserWindow);
+    vi.mocked(BrowserWindow).mockImplementation(
+      () => mockBrowserWindow as unknown as BrowserWindow,
+    );
 
     mockPtyManager = {
       start: vi.fn(),
       dispose: vi.fn(),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (PtyManager as any).mockImplementation(() => mockPtyManager);
+    vi.mocked(PtyManager).mockImplementation(
+      () => mockPtyManager as unknown as PtyManager,
+    );
 
     windowManager = new WindowManager();
   });

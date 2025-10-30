@@ -99,11 +99,7 @@ describe('McpServerForm', () => {
     // We can't easily test the internal state without more complex setup,
     // but we can ensure saving still works and doesn't use the partial JSON.
     fireEvent.click(screen.getByText('Save'));
-    expect(mockOnSave).toHaveBeenCalledWith(
-      '',
-      expect.objectContaining({ headers: undefined }),
-      undefined,
-    );
+    expect(mockOnSave).not.toHaveBeenCalled();
   });
 
   it('calls onSave with the correct data', () => {
@@ -111,7 +107,7 @@ describe('McpServerForm', () => {
       <McpServerForm
         {...baseProps}
         serverName="OriginalName"
-        serverConfig={{}}
+        serverConfig={{ command: 'original-command' }}
       />,
     );
 
@@ -143,5 +139,136 @@ describe('McpServerForm', () => {
     render(<McpServerForm {...baseProps} serverName={null} />);
     fireEvent.click(screen.getByText('Cancel'));
     expect(mockOnCancel).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Validation', () => {
+    it('should have Save button disabled initially (empty form)', () => {
+      render(<McpServerForm {...baseProps} serverName={null} />);
+      expect(screen.getByRole('button', { name: /Save/i })).toBeDisabled();
+      expect(screen.getByText(/Transport required/i)).toBeInTheDocument();
+    });
+
+    it('should keep Save button disabled if only Name is provided', () => {
+      render(<McpServerForm {...baseProps} serverName={null} />);
+
+      fireEvent.change(screen.getByLabelText(/Server Name/i), {
+        target: { value: 'Test Server' },
+      });
+
+      expect(screen.getByRole('button', { name: /Save/i })).toBeDisabled();
+      expect(screen.getByText(/Transport required/i)).toBeInTheDocument();
+    });
+
+    it('should keep Save button disabled if only Transport is provided', () => {
+      render(<McpServerForm {...baseProps} serverName={null} />);
+
+      fireEvent.change(screen.getByLabelText(/Command/i), {
+        target: { value: 'docker' },
+      });
+
+      expect(screen.getByRole('button', { name: /Save/i })).toBeDisabled();
+      // Transport message should be gone, but button still disabled due to missing name
+      expect(screen.queryByText(/Transport required/i)).not.toBeInTheDocument();
+    });
+
+    it('should enable Save button when Name and Transport are provided', () => {
+      render(<McpServerForm {...baseProps} serverName={null} />);
+
+      fireEvent.change(screen.getByLabelText(/Server Name/i), {
+        target: { value: 'Test Server' },
+      });
+      fireEvent.change(screen.getByLabelText(/Command/i), {
+        target: { value: 'docker' },
+      });
+
+      expect(screen.getByRole('button', { name: /Save/i })).not.toBeDisabled();
+      expect(screen.queryByText(/Transport required/i)).not.toBeInTheDocument();
+    });
+
+    it('should validate that at least one transport is sufficient (e.g. URL instead of Command)', () => {
+      render(<McpServerForm {...baseProps} serverName={null} />);
+
+      fireEvent.change(screen.getByLabelText(/Server Name/i), {
+        target: { value: 'SSE Server' },
+      });
+      // Use exact match to avoid matching "HTTP URL"
+      fireEvent.change(screen.getByLabelText(/^URL$/i), {
+        target: { value: 'http://localhost:8080/sse' },
+      });
+
+      expect(screen.getByRole('button', { name: /Save/i })).not.toBeDisabled();
+    });
+
+    it('should show error and disable save button for invalid JSON in Environment Variables', () => {
+      render(<McpServerForm {...baseProps} serverName={null} />);
+
+      const envInput = screen.getByLabelText(/Environment Variables \(JSON\)/i);
+      const saveButton = screen.getByRole('button', { name: /Save/i });
+
+      // Initial state should be valid (empty)
+      expect(saveButton).toBeDisabled(); // Disabled due to missing name/transport
+
+      // Enter invalid JSON
+      fireEvent.change(envInput, { target: { value: '{ "key": "value"' } }); // Missing closing brace
+
+      // Check for error message
+      expect(
+        screen.getByText(/Unexpected end of JSON input|Expected ',' or '}'/i),
+      ).toBeInTheDocument();
+      // Check if save button is disabled
+      expect(saveButton).toBeDisabled();
+
+      // Correct the JSON
+      fireEvent.change(envInput, { target: { value: '{ "key": "value" }' } });
+
+      // Error should be gone
+      expect(
+        screen.queryByText(/Unexpected end of JSON input|Expected ',' or '}'/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it('should show error and disable save button for invalid JSON in Headers', () => {
+      render(<McpServerForm {...baseProps} serverName={null} />);
+
+      const headersInput = screen.getByLabelText(/Headers \(JSON\)/i);
+      const saveButton = screen.getByRole('button', { name: /Save/i });
+
+      // Enter invalid JSON
+      fireEvent.change(headersInput, { target: { value: 'not json' } });
+
+      // Check for error message
+      expect(screen.getByText(/is not valid JSON/i)).toBeInTheDocument();
+      expect(saveButton).toBeDisabled();
+
+      // Correct the JSON
+      fireEvent.change(headersInput, {
+        target: { value: '{ "Authorization": "Bearer 123" }' },
+      });
+
+      // Error should be gone
+      expect(screen.queryByText(/is not valid JSON/i)).not.toBeInTheDocument();
+    });
+
+    it('should show error if JSON is valid but not an object (e.g. array)', () => {
+      render(<McpServerForm {...baseProps} serverName={null} />);
+
+      const envInput = screen.getByLabelText(/Environment Variables \(JSON\)/i);
+      fireEvent.change(envInput, {
+        target: { value: '["array", "is", "invalid"]' },
+      });
+
+      expect(screen.getByText(/Must be a JSON object/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Save/i })).toBeDisabled();
+    });
+
+    it('should show error if JSON is "null"', () => {
+      render(<McpServerForm {...baseProps} serverName={null} />);
+
+      const envInput = screen.getByLabelText(/Environment Variables \(JSON\)/i);
+      fireEvent.change(envInput, { target: { value: 'null' } });
+
+      expect(screen.getByText(/Must be a JSON object/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Save/i })).toBeDisabled();
+    });
   });
 });

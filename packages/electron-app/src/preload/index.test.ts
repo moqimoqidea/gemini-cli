@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { IElectronAPI } from '../renderer/src/types/global';
+import type { IElectronAPI } from '../renderer/types/global';
 
 // Mock the 'electron' module
 const mockIpcRenderer = {

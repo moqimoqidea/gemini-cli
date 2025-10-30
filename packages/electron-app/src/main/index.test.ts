@@ -58,7 +58,7 @@ vi.mock('electron', () => ({
   },
 }));
 
-vi.mock('@google/gemini-cli/dist/src/config/settings.js', () => ({
+vi.mock('@google/gemini-cli', () => ({
   loadSettings: vi.fn(() =>
     Promise.resolve({
       merged: { theme: 'dark' },
@@ -74,9 +74,6 @@ vi.mock('@google/gemini-cli/dist/src/config/settings.js', () => ({
     Workspace: 'Workspace',
     System: 'System',
   },
-}));
-
-vi.mock('@google/gemini-cli/dist/src/ui/themes/theme-manager.js', () => ({
   themeManager: {
     loadCustomThemes: vi.fn(),
     getTheme: vi.fn(() => ({
@@ -84,6 +81,7 @@ vi.mock('@google/gemini-cli/dist/src/ui/themes/theme-manager.js', () => ({
     })),
     getAvailableThemes: vi.fn(() => ['dark', 'light']),
   },
+  getSettingsSchema: vi.fn(() => ({})),
 }));
 
 vi.mock('os', () => ({
@@ -179,9 +177,7 @@ describe('main process (index.ts)', () => {
   });
 
   it('handles settings:set and updates theme', async () => {
-    const { saveSettings } = await import(
-      '@google/gemini-cli/dist/src/config/settings.js'
-    );
+    const { saveSettings } = await import('@google/gemini-cli');
     await import('./index');
     await app.whenReady();
     await wait();

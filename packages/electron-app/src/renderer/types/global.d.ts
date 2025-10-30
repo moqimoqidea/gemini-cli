@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Settings, ThemeDisplay } from '@google/gemini-cli';
+import type {
+  Settings,
+  ThemeDisplay,
+  SettingsSchema,
+} from '@google/gemini-cli';
 import type { IpcRendererEvent } from 'electron';
 import type {
   TerminalResizePayload,
@@ -89,8 +93,7 @@ export interface IElectronAPI {
       workspace: Partial<Settings>;
       system: Partial<Settings>;
     }>;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    getSchema: () => Promise<any>;
+    getSchema: () => Promise<SettingsSchema>;
     set: (settings: {
       changes: Partial<Settings>;
       scope?: string;

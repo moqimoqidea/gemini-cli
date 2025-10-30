@@ -32,6 +32,9 @@ export function McpServerForm({
   // Separate state for the raw JSON string to avoid losing user input
   const [headersJson, setHeadersJson] = useState('');
   const [envJson, setEnvJson] = useState('');
+  const [jsonErrors, setJsonErrors] = useState<Record<string, string | null>>(
+    {},
+  );
 
   useEffect(() => {
     setName(serverName || '');
@@ -45,9 +48,27 @@ export function McpServerForm({
     setEnvJson(
       initialConfig.env ? JSON.stringify(initialConfig.env, null, 2) : '',
     );
+    setJsonErrors({});
   }, [serverName, serverConfig]);
 
+  const isNameValid = name.trim().length > 0;
+  const isTransportConfigured = !!(
+    config.command?.trim() ||
+    config.url?.trim() ||
+    config.httpUrl?.trim() ||
+    config.tcp?.trim()
+  );
+  const isFormValid =
+    isNameValid &&
+    isTransportConfigured &&
+    !jsonErrors.env &&
+    !jsonErrors.headers;
+
   const handleSave = () => {
+    if (!isFormValid) {
+      return;
+    }
+
     // The constructor properties are readonly, so we can't just cast.
     // We need to create a new object with the properties.
     const newConfig = {
@@ -64,7 +85,7 @@ export function McpServerForm({
       description: config.description,
       includeTools: config.includeTools,
       excludeTools: config.excludeTools,
-      extensionName: config.extensionName,
+      extension: config.extension,
       oauth: config.oauth,
       authProviderType: config.authProviderType,
     };
@@ -103,16 +124,31 @@ export function McpServerForm({
     setter: (val: string) => void,
   ) => {
     setter(value); // Update the raw JSON string immediately
+
+    if (value.trim() === '') {
+      handleChange(field, undefined);
+      setJsonErrors((prev) => ({ ...prev, [field]: null }));
+      return;
+    }
+
     try {
       // Only update the actual config if the JSON is valid
       const parsed = JSON.parse(value);
-      if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+      if (
+        parsed !== null &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed)
+      ) {
         handleChange(field, parsed);
+        setJsonErrors((prev) => ({ ...prev, [field]: null }));
+      } else {
+        throw new Error('Must be a JSON object (e.g., {"KEY": "VALUE"})');
       }
-    } catch (_e) {
+    } catch (e) {
       // If JSON is invalid, do nothing with the config,
       // but the user's input is preserved in the textarea.
       handleChange(field, undefined);
+      setJsonErrors((prev) => ({ ...prev, [field]: (e as Error).message }));
     }
   };
 
@@ -127,6 +163,8 @@ export function McpServerForm({
           id="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          className={!isNameValid ? 'input-error' : ''}
+          placeholder="My Server"
         />
       </div>
 
@@ -182,7 +220,11 @@ export function McpServerForm({
           onChange={(e) =>
             handleRecordChange('env', e.target.value, setEnvJson)
           }
+          className={jsonErrors.env ? 'input-error' : ''}
         />
+        {jsonErrors.env && (
+          <div className="error-message">{jsonErrors.env}</div>
+        )}
       </div>
 
       <h5>SSE</h5>
@@ -214,7 +256,11 @@ export function McpServerForm({
           onChange={(e) =>
             handleRecordChange('headers', e.target.value, setHeadersJson)
           }
+          className={jsonErrors.headers ? 'input-error' : ''}
         />
+        {jsonErrors.headers && (
+          <div className="error-message">{jsonErrors.headers}</div>
+        )}
       </div>
 
       <h5>Websocket</h5>
@@ -277,7 +323,17 @@ export function McpServerForm({
       {/* Not including oauth for now as it is a complex object */}
 
       <div className="form-actions">
-        <button onClick={handleSave}>Save</button>
+        {!isTransportConfigured && (
+          <span
+            className="error-message"
+            style={{ marginRight: '10px', alignSelf: 'center' }}
+          >
+            Transport required
+          </span>
+        )}
+        <button onClick={handleSave} disabled={!isFormValid}>
+          Save
+        </button>
         <button onClick={onCancel}>Cancel</button>
       </div>
     </div>

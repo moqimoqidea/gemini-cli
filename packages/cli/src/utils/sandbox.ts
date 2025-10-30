@@ -318,7 +318,6 @@ export async function start_sandbox(
         //   console.info(data.toString());
         // });
         proxyProcess.stderr?.on('data', (data) => {
-          // Changed to debugLogger.debug for internal diagnostics
           debugLogger.debug(`[PROXY STDERR]: ${data.toString().trim()}`);
         });
         proxyProcess.on('close', (code, signal) => {
@@ -789,7 +788,6 @@ export async function start_sandbox(
       //   console.info(data.toString());
       // });
       proxyProcess.stderr?.on('data', (data) => {
-        // Changed to debugLogger.debug for internal diagnostics
         debugLogger.debug(`[PROXY STDERR]: ${data.toString().trim()}`);
       });
       proxyProcess.on('close', (code, signal) => {

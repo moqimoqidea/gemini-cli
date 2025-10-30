@@ -306,15 +306,44 @@ export const useGeminiStream = (
     cancelAllToolCalls(abortControllerRef.current.signal);
 
     if (pendingHistoryItemRef.current) {
-      // The pending item is a UI-specific object. It must be transformed
-      // into the standard HistoryContent format before being committed to the
-      // definitive history.
+      console.log(
+        '[CRS_LOG] History at cancellation:',
+        JSON.stringify(history, null, 2),
+      );
+      // Reconstruct the full model turn from the UI history.
+      // A single model response can be split into multiple history items
+      // ('gemini' and 'gemini_content') for rendering performance. We need
+      // to recombine them to get the full partial text.
+      let fullResponseText = '';
+      const historyForTurn = [...history];
+      let lastItem = historyForTurn.pop();
+
+      // 1. Go backwards and collect all parts of this turn.
+      while (
+        lastItem &&
+        (lastItem.type === 'gemini' || lastItem.type === 'gemini_content')
+      ) {
+        fullResponseText = (lastItem.text || '') + fullResponseText;
+        lastItem = historyForTurn.pop();
+      }
+
+      // 2. Add the final pending chunk.
+      fullResponseText += pendingHistoryItemRef.current.text || '';
+      console.log(
+        '[CRS_LOG] Reconstructed fullResponseText:',
+        fullResponseText,
+      );
+
+      // 3. Commit the full, reconstructed partial response.
       const historyItemToCommit: HistoryContent = {
         role: 'model',
-        parts: [{ text: pendingHistoryItemRef.current.text || '' }],
+        parts: [{ text: fullResponseText }],
       };
+      console.log(
+        '[CRS_LOG] Committing to history:',
+        JSON.stringify(historyItemToCommit, null, 2),
+      );
 
-      // Also commit the partial response to the definitive history so it can be saved.
       geminiClient.commitCancelledResponse(historyItemToCommit);
       addItem(pendingHistoryItemRef.current, Date.now());
     }
@@ -346,6 +375,7 @@ export const useGeminiStream = (
     cancelAllToolCalls,
     toolCalls,
     geminiClient,
+    history,
   ]);
 
   useKeypress(

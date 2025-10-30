@@ -817,11 +817,7 @@ ${authUrl}
         );
       }
     } catch (saveError) {
-      coreEvents.emitFeedback(
-        'error',
-        'Failed to save authentication token.',
-        saveError,
-      );
+      coreEvents.emitFeedback('error', 'Failed to save auth token.', saveError);
       throw saveError;
     }
 
@@ -896,7 +892,7 @@ ${authUrl}
       } catch (error) {
         coreEvents.emitFeedback(
           'error',
-          'Failed to refresh authentication token.',
+          'Failed to refresh auth token.',
           error,
         );
         // Remove invalid token
